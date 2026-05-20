@@ -14,6 +14,19 @@ type ModelInfo = {
   outputUsdPerM: number;
 };
 
+type SortKey =
+  | "model"
+  | "prompt"
+  | "status"
+  | "accuracy"
+  | "Important"
+  | "Can wait"
+  | "Auto-archive"
+  | "Newsletter"
+  | "avgLatencyMs"
+  | "totalCostUsd"
+  | "startedAt";
+
 const BUCKETS = ["Important", "Can wait", "Auto-archive", "Newsletter"] as const;
 
 const BUCKET_HEADER_TINT: Record<string, string> = {
@@ -41,6 +54,10 @@ export default function RunsPanel({
   const [error, setError] = useState<string | null>(null);
   const [expandedRun, setExpandedRun] = useState<Id<"evalRuns"> | null>(null);
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
+  const [sort, setSort] = useState<{
+    key: SortKey;
+    dir: "asc" | "desc";
+  }>({ key: "startedAt", dir: "desc" });
 
   useEffect(() => {
     (async () => {
@@ -64,14 +81,20 @@ export default function RunsPanel({
     (promptVersions ?? []).map((p) => [p._id, p.label]),
   );
 
-  const chartPoints = runs
-    .filter((r) => r.status === "completed" && r.accuracy !== undefined)
-    .map((r) => ({
-      id: r._id,
-      label: r.model,
-      cost: r.totalCostUsd ?? 0,
-      accuracy: r.accuracy ?? 0,
-    }));
+  // Scatter shows only the latest completed run per model so re-runs don't
+  // pile up duplicate dots. `runs` is already sorted newest-first by listRuns.
+  const latestRunByModel = new Map<string, (typeof runs)[number]>();
+  for (const r of runs) {
+    if (r.status === "completed" && !latestRunByModel.has(r.model)) {
+      latestRunByModel.set(r.model, r);
+    }
+  }
+  const chartPoints = Array.from(latestRunByModel.values()).map((r) => ({
+    id: r._id,
+    label: r.model,
+    cost: r.totalCostUsd ?? 0,
+    accuracy: r.accuracy ?? 0,
+  }));
 
   return (
     <section className="space-y-4">
@@ -154,30 +177,45 @@ export default function RunsPanel({
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      <div className="overflow-hidden rounded-md border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-md border border-neutral-200 bg-white">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              <th className="px-3 py-2">Model</th>
-              <th className="px-3 py-2">Prompt</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Accuracy</th>
+              <SortableHeader sort={sort} setSort={setSort} k="model">
+                Model
+              </SortableHeader>
+              <SortableHeader sort={sort} setSort={setSort} k="prompt">
+                Prompt
+              </SortableHeader>
+              <SortableHeader sort={sort} setSort={setSort} k="status">
+                Status
+              </SortableHeader>
+              <SortableHeader sort={sort} setSort={setSort} k="accuracy">
+                Accuracy
+              </SortableHeader>
               {BUCKETS.map((b) => (
-                <th
+                <SortableHeader
                   key={b}
-                  className={`px-3 py-2 ${BUCKET_HEADER_TINT[b] ?? ""}`}
+                  sort={sort}
+                  setSort={setSort}
+                  k={b}
+                  className={BUCKET_HEADER_TINT[b] ?? ""}
                   title={`Per-bucket accuracy: ${b}`}
                 >
                   {b}
-                </th>
+                </SortableHeader>
               ))}
-              <th className="px-3 py-2">Avg latency</th>
-              <th
-                className="px-3 py-2"
+              <SortableHeader sort={sort} setSort={setSort} k="avgLatencyMs">
+                Avg latency
+              </SortableHeader>
+              <SortableHeader
+                sort={sort}
+                setSort={setSort}
+                k="totalCostUsd"
                 title="Total cost in USD for classifying the entire dataset"
               >
                 Total $
-              </th>
+              </SortableHeader>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -192,7 +230,7 @@ export default function RunsPanel({
                 </td>
               </tr>
             )}
-            {runs.map((r) => {
+            {sortRuns(runs, sort, promptVersionLabelById).map((r) => {
               const isExpanded = expandedRun === r._id;
               return (
                 <tr
@@ -282,4 +320,102 @@ function StatusPill({ status }: { status: string }) {
 
 function formatPct(n: number) {
   return `${(n * 100).toFixed(1)}%`;
+}
+
+function SortableHeader({
+  k,
+  sort,
+  setSort,
+  children,
+  className,
+  title,
+}: {
+  k: SortKey;
+  sort: { key: SortKey; dir: "asc" | "desc" };
+  setSort: (s: { key: SortKey; dir: "asc" | "desc" }) => void;
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  const active = sort.key === k;
+  return (
+    <th
+      onClick={() =>
+        setSort({
+          key: k,
+          dir: active ? (sort.dir === "asc" ? "desc" : "asc") : "desc",
+        })
+      }
+      className={`cursor-pointer select-none px-3 py-2 hover:text-neutral-800 ${
+        className ?? ""
+      } ${active ? "text-neutral-900" : ""}`}
+      title={title}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {active && (
+          <span aria-hidden="true">{sort.dir === "asc" ? "↑" : "↓"}</span>
+        )}
+      </span>
+    </th>
+  );
+}
+
+type Run = {
+  _id: Id<"evalRuns">;
+  model: string;
+  promptVersionId?: Id<"promptVersions">;
+  status: string;
+  accuracy?: number;
+  perBucketAccuracy?: Record<string, number>;
+  avgLatencyMs?: number;
+  totalCostUsd?: number;
+  startedAt: number;
+};
+
+function sortRuns(
+  runs: Run[],
+  sort: { key: SortKey; dir: "asc" | "desc" },
+  promptLabels: Map<Id<"promptVersions">, string>,
+): Run[] {
+  const out = [...runs];
+  const mul = sort.dir === "asc" ? 1 : -1;
+  out.sort((a, b) => {
+    const va = getSortValue(a, sort.key, promptLabels);
+    const vb = getSortValue(b, sort.key, promptLabels);
+    if (va === undefined && vb === undefined) return 0;
+    if (va === undefined) return 1; // undefined always sorts last
+    if (vb === undefined) return -1;
+    if (typeof va === "number" && typeof vb === "number") return (va - vb) * mul;
+    return String(va).localeCompare(String(vb)) * mul;
+  });
+  return out;
+}
+
+function getSortValue(
+  r: Run,
+  k: SortKey,
+  promptLabels: Map<Id<"promptVersions">, string>,
+): string | number | undefined {
+  switch (k) {
+    case "model":
+      return r.model;
+    case "prompt":
+      return r.promptVersionId ? promptLabels.get(r.promptVersionId) : "";
+    case "status":
+      return r.status;
+    case "accuracy":
+      return r.accuracy;
+    case "Important":
+    case "Can wait":
+    case "Auto-archive":
+    case "Newsletter":
+      return r.perBucketAccuracy?.[k];
+    case "avgLatencyMs":
+      return r.avgLatencyMs;
+    case "totalCostUsd":
+      return r.totalCostUsd;
+    case "startedAt":
+      return r.startedAt;
+  }
 }

@@ -42,12 +42,14 @@ export default function EvalsPage() {
 
   return (
     <div className="space-y-4">
-      <header className="flex items-center justify-between">
-        <div>
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold">Evals</h2>
-          <p className="text-xs text-neutral-500">
-            Dataset {currentDataset.version} · {currentDataset.generatorModel ?? "unknown"} ·
-            generated {new Date(currentDataset.generatedAt).toLocaleString()}
+          <p className="truncate text-xs text-neutral-500">
+            {currentDataset.version} ·{" "}
+            <span className="font-medium text-neutral-700">
+              generator: {currentDataset.generatorModel ?? "unknown"}
+            </span>
           </p>
         </div>
         {datasets.length > 1 && (
