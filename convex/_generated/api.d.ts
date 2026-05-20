@@ -9,8 +9,14 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as classify from "../classify.js";
+import type * as evalRunner from "../evalRunner.js";
+import type * as evals from "../evals.js";
+import type * as evalsDb from "../evalsDb.js";
 import type * as gmail from "../gmail.js";
 import type * as http from "../http.js";
+import type * as models from "../models.js";
+import type * as prompts from "../prompts.js";
 
 import type {
   ApiFromModules,
@@ -20,8 +26,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  classify: typeof classify;
+  evalRunner: typeof evalRunner;
+  evals: typeof evals;
+  evalsDb: typeof evalsDb;
   gmail: typeof gmail;
   http: typeof http;
+  models: typeof models;
+  prompts: typeof prompts;
 }>;
 
 /**

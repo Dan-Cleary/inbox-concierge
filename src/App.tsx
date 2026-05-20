@@ -5,17 +5,15 @@ import { api } from "../convex/_generated/api";
 
 export default function App() {
   return (
-    <div className="flex min-h-full items-center justify-center p-8">
-      <div className="w-full max-w-lg text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Inbox Concierge
-        </h1>
-        <p className="mt-2 text-neutral-600">
-          Sign in with Google. We pull your last 200 Gmail threads and classify
-          them.
-        </p>
-        <AuthGate />
-      </div>
+    <div className="mx-auto max-w-lg pt-16 text-center">
+      <h1 className="text-3xl font-semibold tracking-tight">
+        Inbox Concierge
+      </h1>
+      <p className="mt-2 text-neutral-600">
+        Sign in with Google. We pull your last 200 Gmail threads and classify
+        them.
+      </p>
+      <AuthGate />
     </div>
   );
 }
