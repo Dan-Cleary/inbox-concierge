@@ -17,6 +17,14 @@ export type ModelConfig = {
 
 export const MODELS: ReadonlyArray<ModelConfig> = [
   {
+    id: "claude-opus-4-7",
+    label: "Claude Opus 4.7",
+    provider: "anthropic",
+    apiModel: "claude-opus-4-7",
+    inputUsdPerM: 15,
+    outputUsdPerM: 75,
+  },
+  {
     id: "claude-sonnet-4-6",
     label: "Claude Sonnet 4.6",
     provider: "anthropic",
@@ -33,36 +41,28 @@ export const MODELS: ReadonlyArray<ModelConfig> = [
     outputUsdPerM: 5,
   },
   {
-    id: "gpt-4o",
-    label: "GPT-4o",
+    id: "gpt-5.5",
+    label: "GPT-5.5",
     provider: "openai",
-    apiModel: "gpt-4o",
+    apiModel: "gpt-5.5",
     inputUsdPerM: 2.5,
     outputUsdPerM: 10,
   },
   {
-    id: "gpt-4o-mini",
-    label: "GPT-4o mini",
+    id: "gpt-5.4-nano",
+    label: "GPT-5.4 nano",
     provider: "openai",
-    apiModel: "gpt-4o-mini",
-    inputUsdPerM: 0.15,
-    outputUsdPerM: 0.6,
+    apiModel: "gpt-5.4-nano",
+    inputUsdPerM: 0.1,
+    outputUsdPerM: 0.4,
   },
   {
-    id: "gemini-2.5-flash",
-    label: "Gemini 2.5 Flash",
+    id: "gemini-3.5-flash",
+    label: "Gemini 3.5 Flash",
     provider: "google",
-    apiModel: "gemini-2.5-flash",
+    apiModel: "gemini-3.5-flash",
     inputUsdPerM: 0.3,
     outputUsdPerM: 2.5,
-  },
-  {
-    id: "gemini-2.5-pro",
-    label: "Gemini 2.5 Pro",
-    provider: "google",
-    apiModel: "gemini-2.5-pro",
-    inputUsdPerM: 1.25,
-    outputUsdPerM: 10,
   },
 ];
 

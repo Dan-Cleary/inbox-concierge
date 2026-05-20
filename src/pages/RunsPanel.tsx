@@ -12,6 +12,15 @@ type ModelInfo = {
   outputUsdPerM: number;
 };
 
+const BUCKETS = ["Important", "Can wait", "Auto-archive", "Newsletter"] as const;
+
+const BUCKET_HEADER_TINT: Record<string, string> = {
+  Important: "text-red-700",
+  "Can wait": "text-amber-700",
+  "Auto-archive": "text-neutral-600",
+  Newsletter: "text-blue-700",
+};
+
 export default function RunsPanel({
   datasetId,
 }: {
@@ -37,9 +46,8 @@ export default function RunsPanel({
   if (runs === undefined || models === null) return null;
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold">Bench</h2>
-      <div className="mt-3 rounded-md border border-neutral-200 bg-white p-4">
+    <section className="space-y-4">
+      <div className="rounded-md border border-neutral-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-neutral-600">Models:</span>
           {models.map((m) => (
@@ -88,24 +96,39 @@ export default function RunsPanel({
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-md border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-neutral-200 bg-white">
         <table className="w-full text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-3 py-2">Model</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Accuracy</th>
-              <th className="px-3 py-2">Per bucket</th>
+              {BUCKETS.map((b) => (
+                <th
+                  key={b}
+                  className={`px-3 py-2 ${BUCKET_HEADER_TINT[b] ?? ""}`}
+                  title={`Per-bucket accuracy: ${b}`}
+                >
+                  {b}
+                </th>
+              ))}
               <th className="px-3 py-2">Avg latency</th>
-              <th className="px-3 py-2">Cost</th>
-              <th className="px-3 py-2">Started</th>
+              <th
+                className="px-3 py-2"
+                title="Total cost in USD for classifying the entire dataset"
+              >
+                Total $
+              </th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {runs.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-4 text-center text-neutral-500">
+                <td
+                  colSpan={9}
+                  className="px-3 py-4 text-center text-neutral-500"
+                >
                   No runs yet.
                 </td>
               </tr>
@@ -116,16 +139,16 @@ export default function RunsPanel({
                 <td className="px-3 py-2">
                   <StatusPill status={r.status} />
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 font-semibold">
                   {r.accuracy !== undefined ? formatPct(r.accuracy) : "—"}
                 </td>
-                <td className="px-3 py-2 text-xs">
-                  {r.perBucketAccuracy
-                    ? Object.entries(r.perBucketAccuracy)
-                        .map(([k, v]) => `${k.slice(0, 3)}: ${formatPct(v)}`)
-                        .join(" · ")
-                    : "—"}
-                </td>
+                {BUCKETS.map((b) => (
+                  <td key={b} className="px-3 py-2 text-xs">
+                    {r.perBucketAccuracy && r.perBucketAccuracy[b] !== undefined
+                      ? formatPct(r.perBucketAccuracy[b])
+                      : "—"}
+                  </td>
+                ))}
                 <td className="px-3 py-2">
                   {r.avgLatencyMs ? `${Math.round(r.avgLatencyMs)}ms` : "—"}
                 </td>
@@ -133,9 +156,6 @@ export default function RunsPanel({
                   {r.totalCostUsd !== undefined
                     ? `$${r.totalCostUsd.toFixed(4)}`
                     : "—"}
-                </td>
-                <td className="px-3 py-2 text-xs text-neutral-500">
-                  {new Date(r.startedAt).toLocaleTimeString()}
                 </td>
                 <td className="px-3 py-2 text-right">
                   {r.status === "completed" && (
