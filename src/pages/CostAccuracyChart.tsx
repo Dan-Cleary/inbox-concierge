@@ -1,5 +1,15 @@
-// Tiny scatter chart: x = cost (log scale), y = accuracy. Pareto-front
-// shows up clearly at the top-left. Used below the bench table.
+import {
+  CartesianGrid,
+  Label,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+  ZAxis,
+} from "recharts";
+
 type Point = {
   id: string;
   label: string;
@@ -7,146 +17,169 @@ type Point = {
   accuracy: number;
 };
 
+// Cost-vs-accuracy scatter. Log-scale on X (cost spans orders of magnitude),
+// percent on Y. Pareto front (best-acc-at-any-given-cost) highlighted as a
+// second scatter series in green so it pops without a separate line geometry.
 export default function CostAccuracyChart({ points }: { points: Point[] }) {
   if (points.length === 0) return null;
 
-  const W = 520;
-  const H = 200;
-  const PAD_L = 50;
-  const PAD_R = 16;
-  const PAD_T = 16;
-  const PAD_B = 32;
-  const plotW = W - PAD_L - PAD_R;
-  const plotH = H - PAD_T - PAD_B;
-
-  const costs = points.map((p) => p.cost).filter((c) => c > 0);
-  const minCost = Math.min(...costs);
-  const maxCost = Math.max(...costs);
-  const minLogCost = Math.log10(minCost);
-  const maxLogCost = Math.log10(maxCost);
-  const xRange = Math.max(0.0001, maxLogCost - minLogCost);
-
-  const xOf = (cost: number) => {
-    if (cost <= 0) return PAD_L;
-    const t = (Math.log10(cost) - minLogCost) / xRange;
-    return PAD_L + t * plotW;
-  };
-  const yOf = (acc: number) => PAD_T + (1 - acc) * plotH;
-
-  // Pareto front: best accuracy at each cost-or-better.
   const sorted = [...points].sort((a, b) => a.cost - b.cost);
-  const front: Point[] = [];
+  const frontIds = new Set<string>();
   let bestAcc = -Infinity;
   for (const p of sorted) {
     if (p.accuracy > bestAcc) {
-      front.push(p);
+      frontIds.add(p.id);
       bestAcc = p.accuracy;
     }
   }
 
-  const accTicks = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+  const data = points.map((p) => ({
+    ...p,
+    accuracyPct: p.accuracy * 100,
+    onFront: frontIds.has(p.id),
+  }));
+
+  const frontData = data.filter((d) => d.onFront);
+  const restData = data.filter((d) => !d.onFront);
+
+  const costs = points.map((p) => p.cost).filter((c) => c > 0);
+  const minCost = Math.min(...costs);
+  const maxCost = Math.max(...costs);
+  const xDomain = [minCost * 0.6, maxCost * 1.6];
+
+  const accuracies = points.map((p) => p.accuracy * 100);
+  const minAcc = Math.min(...accuracies);
+  const maxAcc = Math.max(...accuracies);
+  const yPad = Math.max(2, (maxAcc - minAcc) * 0.2);
+  const yDomain = [Math.max(0, Math.floor(minAcc - yPad)), Math.min(100, Math.ceil(maxAcc + yPad))];
 
   return (
-    <div className="rounded-md border border-neutral-200 bg-white p-3">
+    <div className="rounded-md border border-neutral-200 bg-white p-4">
       <div className="flex items-baseline justify-between">
         <h3 className="text-sm font-semibold">Cost vs accuracy</h3>
-        <span className="text-xs text-neutral-500">log-scale cost · top-left wins</span>
+        <span className="text-xs text-neutral-500">
+          green = pareto-optimal · top-left wins
+        </span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full">
-        {/* Accuracy gridlines + ticks */}
-        {accTicks.map((t) => (
-          <g key={t}>
-            <line
-              x1={PAD_L}
-              x2={W - PAD_R}
-              y1={yOf(t)}
-              y2={yOf(t)}
-              stroke="#f3f4f6"
-            />
-            <text
-              x={PAD_L - 6}
-              y={yOf(t) + 4}
-              fontSize="10"
-              fill="#9ca3af"
-              textAnchor="end"
+      <div className="mt-3 h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 8, right: 24, bottom: 36, left: 16 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis
+              type="number"
+              dataKey="cost"
+              scale="log"
+              domain={xDomain}
+              tickFormatter={(v: number) =>
+                v < 0.01
+                  ? `$${v.toFixed(4)}`
+                  : v < 1
+                    ? `$${v.toFixed(2)}`
+                    : `$${v.toFixed(2)}`
+              }
+              tick={{ fontSize: 11, fill: "#6b7280" }}
+              stroke="#9ca3af"
+              allowDataOverflow={false}
             >
-              {Math.round(t * 100)}%
-            </text>
-          </g>
-        ))}
-        {/* X axis cost ticks */}
-        {(() => {
-          const ticks: number[] = [];
-          const lo = Math.floor(minLogCost);
-          const hi = Math.ceil(maxLogCost);
-          for (let i = lo; i <= hi; i++) ticks.push(Math.pow(10, i));
-          return ticks.map((c) => (
-            <g key={c}>
-              <line
-                x1={xOf(c)}
-                x2={xOf(c)}
-                y1={PAD_T}
-                y2={H - PAD_B}
-                stroke="#f3f4f6"
+              <Label
+                value="total cost per run (USD, log scale)"
+                position="bottom"
+                offset={12}
+                style={{ fontSize: 11, fill: "#6b7280" }}
               />
-              <text
-                x={xOf(c)}
-                y={H - PAD_B + 14}
-                fontSize="10"
-                fill="#9ca3af"
-                textAnchor="middle"
-              >
-                {c < 0.01 ? `$${c.toFixed(4)}` : c < 1 ? `$${c.toFixed(2)}` : `$${c}`}
-              </text>
-            </g>
-          ));
-        })()}
-        {/* Axis labels */}
-        <text
-          x={PAD_L + plotW / 2}
-          y={H - 4}
-          fontSize="10"
-          fill="#6b7280"
-          textAnchor="middle"
-        >
-          total cost per run (USD, log scale)
-        </text>
-        {/* Pareto-front line */}
-        {front.length >= 2 && (
-          <polyline
-            points={front
-              .map((p) => `${xOf(p.cost)},${yOf(p.accuracy)}`)
-              .join(" ")}
-            fill="none"
-            stroke="#10b981"
-            strokeWidth={1.5}
-            strokeDasharray="3 3"
-          />
-        )}
-        {/* Points */}
-        {points.map((p) => {
-          const isFront = front.includes(p);
-          return (
-            <g key={p.id}>
-              <circle
-                cx={xOf(p.cost)}
-                cy={yOf(p.accuracy)}
-                r={isFront ? 5 : 4}
-                fill={isFront ? "#10b981" : "#3b82f6"}
-                opacity={0.85}
+            </XAxis>
+            <YAxis
+              type="number"
+              dataKey="accuracyPct"
+              domain={yDomain}
+              tickFormatter={(v: number) => `${v}%`}
+              tick={{ fontSize: 11, fill: "#6b7280" }}
+              stroke="#9ca3af"
+              width={48}
+            >
+              <Label
+                value="accuracy"
+                angle={-90}
+                position="left"
+                offset={-2}
+                style={{ fontSize: 11, fill: "#6b7280" }}
               />
-              <text
-                x={xOf(p.cost) + 8}
-                y={yOf(p.accuracy) - 4}
-                fontSize="10"
-                fill="#374151"
-              >
-                {p.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+            </YAxis>
+            <ZAxis range={[80, 80]} />
+            <Tooltip
+              cursor={{ strokeDasharray: "3 3" }}
+              content={<CustomTooltip />}
+            />
+            <Scatter
+              name="other models"
+              data={restData}
+              fill="#3b82f6"
+              shape={(props: ScatterShapeProps) => (
+                <LabeledDot {...props} color="#3b82f6" />
+              )}
+            />
+            <Scatter
+              name="pareto front"
+              data={frontData}
+              fill="#10b981"
+              shape={(props: ScatterShapeProps) => (
+                <LabeledDot {...props} color="#10b981" />
+              )}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// Recharts passes lots of props through to shape renderers; we only care
+// about cx/cy/payload, but the rest exist at runtime.
+type ScatterShapeProps = {
+  cx?: number;
+  cy?: number;
+  payload?: { label: string };
+};
+
+function LabeledDot({ cx, cy, payload, color }: ScatterShapeProps & { color: string }) {
+  if (cx === undefined || cy === undefined || !payload) return null;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />
+      <text
+        x={cx + 8}
+        y={cy - 6}
+        fontSize={10}
+        fill="#374151"
+        style={{ pointerEvents: "none" }}
+      >
+        {payload.label}
+      </text>
+    </g>
+  );
+}
+
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    payload: { label: string; cost: number; accuracy: number; onFront: boolean };
+  }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs shadow-sm">
+      <div className="font-medium text-neutral-900">{p.label}</div>
+      <div className="mt-1 text-neutral-600">
+        {(p.accuracy * 100).toFixed(1)}% accuracy
+      </div>
+      <div className="text-neutral-600">${p.cost.toFixed(4)} / run</div>
+      {p.onFront && (
+        <div className="mt-1 font-medium text-green-700">pareto-optimal</div>
+      )}
     </div>
   );
 }
