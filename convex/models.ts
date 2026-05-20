@@ -49,6 +49,14 @@ export const MODELS: ReadonlyArray<ModelConfig> = [
     outputUsdPerM: 10,
   },
   {
+    id: "gpt-5.4-mini",
+    label: "GPT-5.4 mini",
+    provider: "openai",
+    apiModel: "gpt-5.4-mini",
+    inputUsdPerM: 0.25,
+    outputUsdPerM: 1,
+  },
+  {
     id: "gpt-5.4-nano",
     label: "GPT-5.4 nano",
     provider: "openai",

@@ -161,11 +161,13 @@ export const startRun = internalMutation({
   args: {
     datasetId: v.id("evalDatasets"),
     model: v.string(),
+    promptVersionId: v.optional(v.id("promptVersions")),
   },
   handler: async (ctx, args): Promise<Id<"evalRuns">> => {
     return ctx.db.insert("evalRuns", {
       datasetId: args.datasetId,
       model: args.model,
+      promptVersionId: args.promptVersionId,
       startedAt: Date.now(),
       status: "running",
     });
@@ -240,9 +242,26 @@ export const listRuns = query({
 export const getRunResults = query({
   args: { runId: v.id("evalRuns") },
   handler: async (ctx, { runId }) => {
-    return ctx.db
+    const results = await ctx.db
       .query("evalRunResults")
       .withIndex("by_run", (q) => q.eq("runId", runId))
       .collect();
+    // Join in dataset email content so the inspector can show subject/from/
+    // snippet without a second round-trip.
+    return Promise.all(
+      results.map(async (r) => {
+        const email = await ctx.db.get(r.datasetEmailId);
+        return {
+          ...r,
+          email: email
+            ? {
+                subject: email.subject,
+                from: email.from,
+                snippet: email.snippet,
+              }
+            : null,
+        };
+      }),
+    );
   },
 });

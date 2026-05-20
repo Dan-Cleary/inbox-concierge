@@ -60,9 +60,13 @@ export const classifyBatch = internalAction({
       v.object({ name: v.string(), description: v.string() }),
     ),
     emails: v.array(emailInputValidator),
+    promptTemplate: v.optional(v.string()),
   },
   handler: async (_ctx, args): Promise<ClassifyBatchResult> => {
-    const system = buildClassificationSystemPrompt(args.buckets);
+    const system = buildClassificationSystemPrompt(
+      args.buckets,
+      args.promptTemplate,
+    );
     const bucketNames = args.buckets.map((b) => b.name);
     const itemSchema = z.object({
       id: z.string(),

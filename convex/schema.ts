@@ -100,6 +100,7 @@ export default defineSchema({
   evalRuns: defineTable({
     datasetId: v.id("evalDatasets"),
     model: v.string(),
+    promptVersionId: v.optional(v.id("promptVersions")),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
     status: v.union(
@@ -112,6 +113,16 @@ export default defineSchema({
     avgLatencyMs: v.optional(v.number()),
     totalCostUsd: v.optional(v.number()),
   }).index("by_dataset", ["datasetId"]),
+
+  // Versioned classification prompt templates. The template body must contain
+  // a `{{BUCKETS}}` placeholder that gets substituted with the active bucket
+  // taxonomy (default buckets in evals; user buckets in production).
+  promptVersions: defineTable({
+    label: v.string(),
+    template: v.string(),
+    createdAt: v.number(),
+    notes: v.optional(v.string()),
+  }),
 
   evalRunResults: defineTable({
     runId: v.id("evalRuns"),

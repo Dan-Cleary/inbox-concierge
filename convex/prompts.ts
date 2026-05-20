@@ -82,18 +82,13 @@ export const CLASSIFICATION_EXAMPLES = [
   },
 ] as const;
 
-// Classification prompt template. Bucket definitions are injected so the
-// same prompt works for default buckets, custom buckets, or a mix.
-export function buildClassificationSystemPrompt(
-  buckets: ReadonlyArray<{ name: string; description: string }>,
-): string {
-  return `You classify emails into exactly one of the user's buckets.
+// Default template body. Edit/version this via the Edit Prompts UI.
+// `{{BUCKETS}}` is substituted with the active bucket taxonomy at render time.
+export const DEFAULT_PROMPT_TEMPLATE = `You classify emails into exactly one of the user's buckets.
 
 The user's buckets are:
 
-${buckets
-  .map((b, i) => `${i + 1}. ${b.name} — ${b.description}`)
-  .join("\n\n")}
+{{BUCKETS}}
 
 Rules:
 - Choose exactly one bucket per email.
@@ -106,6 +101,22 @@ For each email, return a JSON object with two fields:
 - "reason": one short sentence (max 15 words) explaining why
 
 Return a JSON array, one object per input email, in the same order.`;
+
+export function renderBucketTaxonomy(
+  buckets: ReadonlyArray<{ name: string; description: string }>,
+): string {
+  return buckets
+    .map((b, i) => `${i + 1}. ${b.name} — ${b.description}`)
+    .join("\n\n");
+}
+
+// Classification prompt template. Bucket definitions are injected so the
+// same prompt works for default buckets, custom buckets, or a mix.
+export function buildClassificationSystemPrompt(
+  buckets: ReadonlyArray<{ name: string; description: string }>,
+  template: string = DEFAULT_PROMPT_TEMPLATE,
+): string {
+  return template.replace("{{BUCKETS}}", renderBucketTaxonomy(buckets));
 }
 
 // Shorthand for the common case: default buckets only.

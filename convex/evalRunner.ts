@@ -16,6 +16,7 @@ export const runBench = action({
   args: {
     datasetId: v.id("evalDatasets"),
     modelIds: v.array(v.string()),
+    promptVersionId: v.optional(v.id("promptVersions")),
   },
   handler: async (
     ctx,
@@ -29,6 +30,27 @@ export const runBench = action({
       throw new Error("Dataset is empty");
     }
 
+    // Resolve the prompt version: explicit id, else latest, else seed default.
+    let promptVersionId = args.promptVersionId ?? null;
+    let promptTemplate: string | undefined;
+    if (promptVersionId) {
+      const pv = await ctx.runQuery(internal.promptVersions.getById, {
+        id: promptVersionId,
+      });
+      promptTemplate = pv?.template;
+    } else {
+      const pv = await ctx.runQuery(internal.promptVersions.latest, {});
+      if (pv) {
+        promptVersionId = pv._id;
+        promptTemplate = pv.template;
+      } else {
+        promptVersionId = await ctx.runMutation(
+          internal.promptVersions.seedDefaultVersion,
+          {},
+        );
+      }
+    }
+
     const runIds: Id<"evalRuns">[] = [];
 
     // One run per model, but run all models concurrently.
@@ -36,7 +58,11 @@ export const runBench = action({
       args.modelIds.map(async (modelId): Promise<void> => {
         const runId: Id<"evalRuns"> = await ctx.runMutation(
           internal.evalsDb.startRun,
-          { datasetId: args.datasetId, model: modelId },
+          {
+            datasetId: args.datasetId,
+            model: modelId,
+            promptVersionId: promptVersionId ?? undefined,
+          },
         );
         runIds.push(runId);
 
@@ -76,6 +102,7 @@ export const runBench = action({
                   from: e.from,
                   snippet: e.snippet,
                 })),
+                promptTemplate,
               },
             )) as ClassifyBatchResult;
             totalLatencyMs += res.latencyMs;

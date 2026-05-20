@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import RunDetail from "./RunDetail";
+import CostAccuracyChart from "./CostAccuracyChart";
+import PromptEditor from "./PromptEditor";
 
 type ModelInfo = {
   id: string;
@@ -27,23 +29,49 @@ export default function RunsPanel({
   datasetId: Id<"evalDatasets">;
 }) {
   const runs = useQuery(api.evalsDb.listRuns, { datasetId });
+  const promptVersions = useQuery(api.promptVersions.list);
   const runBench = useAction(api.evalRunner.runBench);
   const listModels = useAction(api.evalRunner.listModels);
   const [models, setModels] = useState<ModelInfo[] | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  const [selectedPromptVersionId, setSelectedPromptVersionId] = useState<
+    Id<"promptVersions"> | null
+  >(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRun, setExpandedRun] = useState<Id<"evalRuns"> | null>(null);
+  const [promptEditorOpen, setPromptEditorOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
       const ms = (await listModels({})) as ModelInfo[];
       setModels(ms);
-      setSelected(new Set(ms.map((m) => m.id)));
+      setSelectedModels(new Set(ms.map((m) => m.id)));
     })();
   }, [listModels]);
 
+  // Default the prompt selector to the latest version once they load.
+  useEffect(() => {
+    if (selectedPromptVersionId || !promptVersions || promptVersions.length === 0) {
+      return;
+    }
+    setSelectedPromptVersionId(promptVersions[0]._id);
+  }, [promptVersions, selectedPromptVersionId]);
+
   if (runs === undefined || models === null) return null;
+
+  const promptVersionLabelById = new Map(
+    (promptVersions ?? []).map((p) => [p._id, p.label]),
+  );
+
+  const chartPoints = runs
+    .filter((r) => r.status === "completed" && r.accuracy !== undefined)
+    .map((r) => ({
+      id: r._id,
+      label: r.model,
+      cost: r.totalCostUsd ?? 0,
+      accuracy: r.accuracy ?? 0,
+    }));
 
   return (
     <section className="space-y-4">
@@ -57,12 +85,12 @@ export default function RunsPanel({
             >
               <input
                 type="checkbox"
-                checked={selected.has(m.id)}
+                checked={selectedModels.has(m.id)}
                 onChange={(e) => {
-                  const next = new Set(selected);
+                  const next = new Set(selectedModels);
                   if (e.target.checked) next.add(m.id);
                   else next.delete(m.id);
-                  setSelected(next);
+                  setSelectedModels(next);
                 }}
               />
               <span className="font-medium">{m.label}</span>
@@ -71,16 +99,46 @@ export default function RunsPanel({
               </span>
             </label>
           ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-neutral-600">Prompt:</span>
+          <select
+            value={selectedPromptVersionId ?? ""}
+            onChange={(e) =>
+              setSelectedPromptVersionId(
+                (e.target.value || null) as Id<"promptVersions"> | null,
+              )
+            }
+            className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
+          >
+            {(promptVersions ?? []).length === 0 && (
+              <option value="">latest (will seed on first run)</option>
+            )}
+            {(promptVersions ?? []).map((p, i) => (
+              <option key={p._id} value={p._id}>
+                {p.label}
+                {i === 0 ? " (latest)" : ""}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
-            disabled={running || selected.size === 0}
+            onClick={() => setPromptEditorOpen(true)}
+            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+          >
+            Edit prompt
+          </button>
+          <button
+            type="button"
+            disabled={running || selectedModels.size === 0}
             onClick={async () => {
               setRunning(true);
               setError(null);
               try {
                 await runBench({
                   datasetId,
-                  modelIds: Array.from(selected),
+                  modelIds: Array.from(selectedModels),
+                  promptVersionId: selectedPromptVersionId ?? undefined,
                 });
               } catch (err) {
                 setError(err instanceof Error ? err.message : String(err));
@@ -101,6 +159,7 @@ export default function RunsPanel({
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-3 py-2">Model</th>
+              <th className="px-3 py-2">Prompt</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Accuracy</th>
               {BUCKETS.map((b) => (
@@ -126,57 +185,81 @@ export default function RunsPanel({
             {runs.length === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="px-3 py-4 text-center text-neutral-500"
                 >
                   No runs yet.
                 </td>
               </tr>
             )}
-            {runs.map((r) => (
-              <tr key={r._id}>
-                <td className="px-3 py-2 font-medium">{r.model}</td>
-                <td className="px-3 py-2">
-                  <StatusPill status={r.status} />
-                </td>
-                <td className="px-3 py-2 font-semibold">
-                  {r.accuracy !== undefined ? formatPct(r.accuracy) : "—"}
-                </td>
-                {BUCKETS.map((b) => (
-                  <td key={b} className="px-3 py-2 text-xs">
-                    {r.perBucketAccuracy && r.perBucketAccuracy[b] !== undefined
-                      ? formatPct(r.perBucketAccuracy[b])
+            {runs.map((r) => {
+              const isExpanded = expandedRun === r._id;
+              return (
+                <tr
+                  key={r._id}
+                  className={
+                    isExpanded
+                      ? "bg-blue-50/60 ring-1 ring-inset ring-blue-300"
+                      : ""
+                  }
+                >
+                  <td className="px-3 py-2 font-medium">{r.model}</td>
+                  <td className="px-3 py-2 text-xs text-neutral-500">
+                    {r.promptVersionId
+                      ? (promptVersionLabelById.get(r.promptVersionId) ??
+                        "deleted")
                       : "—"}
                   </td>
-                ))}
-                <td className="px-3 py-2">
-                  {r.avgLatencyMs ? `${Math.round(r.avgLatencyMs)}ms` : "—"}
-                </td>
-                <td className="px-3 py-2">
-                  {r.totalCostUsd !== undefined
-                    ? `$${r.totalCostUsd.toFixed(4)}`
-                    : "—"}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {r.status === "completed" && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedRun(expandedRun === r._id ? null : r._id)
-                      }
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      {expandedRun === r._id ? "Hide" : "Inspect"}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  <td className="px-3 py-2">
+                    <StatusPill status={r.status} />
+                  </td>
+                  <td className="px-3 py-2 font-semibold">
+                    {r.accuracy !== undefined ? formatPct(r.accuracy) : "—"}
+                  </td>
+                  {BUCKETS.map((b) => (
+                    <td key={b} className="px-3 py-2 text-xs">
+                      {r.perBucketAccuracy &&
+                      r.perBucketAccuracy[b] !== undefined
+                        ? formatPct(r.perBucketAccuracy[b])
+                        : "—"}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2">
+                    {r.avgLatencyMs ? `${Math.round(r.avgLatencyMs)}ms` : "—"}
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.totalCostUsd !== undefined
+                      ? `$${r.totalCostUsd.toFixed(4)}`
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {r.status === "completed" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedRun(isExpanded ? null : r._id)
+                        }
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        {isExpanded ? "Hide" : "Inspect"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {expandedRun && <RunDetail runId={expandedRun} />}
+
+      <CostAccuracyChart points={chartPoints} />
+
+      <PromptEditor
+        open={promptEditorOpen}
+        onClose={() => setPromptEditorOpen(false)}
+      />
     </section>
   );
 }
