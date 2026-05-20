@@ -24,6 +24,9 @@ export default function EvalsPage() {
     return <p className="text-sm text-neutral-500">Loading…</p>;
   }
 
+  const anyLocked = datasets.some((d) => d.locked);
+  const selectedDataset = datasets.find((d) => d._id === selected);
+
   return (
     <div className="space-y-8">
       <section>
@@ -43,8 +46,21 @@ export default function EvalsPage() {
             </label>
             <button
               type="button"
-              disabled={generating}
+              disabled={generating || anyLocked}
+              title={
+                anyLocked
+                  ? "A locked dataset already exists. Unlock or delete it first."
+                  : undefined
+              }
               onClick={async () => {
+                if (
+                  datasets.length > 0 &&
+                  !confirm(
+                    "Generate a new dataset? You already have one — runs against the new one won't be comparable to the old.",
+                  )
+                ) {
+                  return;
+                }
                 setGenerating(true);
                 setError(null);
                 try {
@@ -83,7 +99,8 @@ export default function EvalsPage() {
                   }`}
                 >
                   {d.version} · {new Date(d.generatedAt).toLocaleString()}
-                  {d.reviewedAt && " ✓"}
+                  {d.locked && " 🔒"}
+                  {!d.locked && d.reviewedAt && " ✓"}
                 </button>
               </li>
             ))}
@@ -109,9 +126,9 @@ export default function EvalsPage() {
         )}
       </section>
 
-      {selected && (
+      {selected && selectedDataset && (
         <>
-          <DatasetTable datasetId={selected} />
+          <DatasetTable datasetId={selected} locked={selectedDataset.locked} />
           <RunsPanel datasetId={selected} />
         </>
       )}

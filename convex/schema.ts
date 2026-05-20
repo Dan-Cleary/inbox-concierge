@@ -79,6 +79,11 @@ export default defineSchema({
     generatedAt: v.number(),
     reviewedAt: v.optional(v.number()),
     notes: v.optional(v.string()),
+    generatorModel: v.optional(v.string()),
+    // Once locked, labels are frozen and no new dataset can be generated
+    // (avoids accidental drift while comparing model accuracy over time).
+    locked: v.optional(v.boolean()),
+    lockedAt: v.optional(v.number()),
   }),
 
   evalDatasetEmails: defineTable({

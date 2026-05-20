@@ -3,7 +3,7 @@
 // approximate as of the build date — used only for relative comparison
 // in the eval UI, not billing.
 
-export type ModelProvider = "openai" | "anthropic";
+export type ModelProvider = "openai" | "anthropic" | "google";
 
 export type ModelConfig = {
   id: string;
@@ -47,6 +47,22 @@ export const MODELS: ReadonlyArray<ModelConfig> = [
     apiModel: "gpt-4o-mini",
     inputUsdPerM: 0.15,
     outputUsdPerM: 0.6,
+  },
+  {
+    id: "gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    provider: "google",
+    apiModel: "gemini-2.5-flash",
+    inputUsdPerM: 0.3,
+    outputUsdPerM: 2.5,
+  },
+  {
+    id: "gemini-2.5-pro",
+    label: "Gemini 2.5 Pro",
+    provider: "google",
+    apiModel: "gemini-2.5-pro",
+    inputUsdPerM: 1.25,
+    outputUsdPerM: 10,
   },
 ];
 

@@ -14,12 +14,16 @@ const BUCKET_TINT: Record<string, string> = {
 
 export default function DatasetTable({
   datasetId,
+  locked,
 }: {
   datasetId: Id<"evalDatasets">;
+  locked: boolean;
 }) {
   const emails = useQuery(api.evalsDb.getDatasetEmails, { datasetId });
   const updateEmail = useMutation(api.evalsDb.updateDatasetEmail);
   const markReviewed = useMutation(api.evalsDb.markDatasetReviewed);
+  const lockDataset = useMutation(api.evalsDb.lockDataset);
+  const unlockDataset = useMutation(api.evalsDb.unlockDataset);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   if (emails === undefined) return <p className="text-sm text-neutral-500">Loading…</p>;
@@ -31,14 +35,54 @@ export default function DatasetTable({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">
           Dataset ({emails.length} emails · {reviewedCount} reviewed)
+          {locked && (
+            <span className="ml-2 rounded bg-neutral-900 px-1.5 py-0.5 text-xs font-medium text-white">
+              LOCKED
+            </span>
+          )}
         </h2>
-        <button
-          type="button"
-          onClick={() => markReviewed({ datasetId })}
-          className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
-        >
-          Mark dataset reviewed
-        </button>
+        <div className="flex gap-2">
+          {!locked && (
+            <button
+              type="button"
+              onClick={() => markReviewed({ datasetId })}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              Mark reviewed
+            </button>
+          )}
+          {locked ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  confirm(
+                    "Unlock dataset? Editing labels after this will invalidate prior benchmark comparisons.",
+                  )
+                )
+                  unlockDataset({ datasetId });
+              }}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              Unlock
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  confirm(
+                    "Lock this dataset? Labels will be frozen and no new datasets can be generated until you unlock.",
+                  )
+                )
+                  lockDataset({ datasetId });
+              }}
+              className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
+            >
+              Lock dataset
+            </button>
+          )}
+        </div>
       </div>
       <div className="mt-3 overflow-hidden rounded-md border border-neutral-200 bg-white">
         <table className="w-full text-sm">
@@ -57,7 +101,7 @@ export default function DatasetTable({
                   <input
                     type="checkbox"
                     checked={e.reviewed}
-                    disabled={busyId === e._id}
+                    disabled={busyId === e._id || locked}
                     onChange={async () => {
                       setBusyId(e._id);
                       await updateEmail({
@@ -85,7 +129,7 @@ export default function DatasetTable({
                 <td className="px-3 py-2 align-top">
                   <select
                     value={e.expectedBucket}
-                    disabled={busyId === e._id}
+                    disabled={busyId === e._id || locked}
                     onChange={async (ev) => {
                       setBusyId(e._id);
                       await updateEmail({

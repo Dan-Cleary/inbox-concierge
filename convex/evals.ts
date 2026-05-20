@@ -4,9 +4,11 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { generateObject } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { DEFAULT_BUCKETS } from "./prompts";
+
+const GENERATOR_MODEL = "gpt-5.5";
 
 // Generate a synthetic eval dataset using Claude. Produces roughly evenly
 // distributed examples across the default buckets, plus a few intentionally
@@ -60,7 +62,7 @@ Requirements:
 Return a JSON object with an "emails" array.`;
 
     const { object } = await generateObject({
-      model: anthropic("claude-sonnet-4-6"),
+      model: openai(GENERATOR_MODEL),
       schema,
       prompt,
     });
@@ -70,6 +72,7 @@ Return a JSON object with an "emails" array.`;
       {
         notes: args.notes,
         emails: object.emails,
+        generatorModel: GENERATOR_MODEL,
       },
     );
 

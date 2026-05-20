@@ -18,14 +18,27 @@ const emailInput = v.object({
 export const createDataset = internalMutation({
   args: {
     notes: v.optional(v.string()),
+    generatorModel: v.optional(v.string()),
     emails: v.array(emailInput),
   },
   handler: async (ctx, args): Promise<Id<"evalDatasets">> => {
+    // Refuse to create a new dataset if any existing one is locked — the
+    // user has explicitly committed to a canonical set, don't shadow it.
+    const existing = await ctx.db.query("evalDatasets").collect();
+    const lockedExists = existing.some((d) => d.locked === true);
+    if (lockedExists) {
+      throw new Error(
+        "A locked dataset already exists. Unlock or delete it before generating a new one.",
+      );
+    }
+
     const version = `v${Date.now()}`;
     const datasetId = await ctx.db.insert("evalDatasets", {
       version,
       generatedAt: Date.now(),
       notes: args.notes,
+      generatorModel: args.generatorModel,
+      locked: false,
     });
     for (const e of args.emails) {
       await ctx.db.insert("evalDatasetEmails", {
@@ -54,6 +67,9 @@ export const listDatasets = query({
         generatedAt: d.generatedAt,
         reviewedAt: d.reviewedAt,
         notes: d.notes,
+        generatorModel: d.generatorModel,
+        locked: d.locked === true,
+        lockedAt: d.lockedAt,
       }));
   },
 });
@@ -88,6 +104,12 @@ export const updateDatasetEmail = mutation({
     reviewed: v.optional(v.boolean()),
   },
   handler: async (ctx, { emailId, ...rest }) => {
+    const email = await ctx.db.get(emailId);
+    if (!email) throw new Error("Email not found");
+    const dataset = await ctx.db.get(email.datasetId);
+    if (dataset?.locked) {
+      throw new Error("Dataset is locked; unlock to edit labels.");
+    }
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(rest)) {
       if (v !== undefined) patch[k] = v;
@@ -100,6 +122,24 @@ export const markDatasetReviewed = mutation({
   args: { datasetId: v.id("evalDatasets") },
   handler: async (ctx, { datasetId }) => {
     await ctx.db.patch(datasetId, { reviewedAt: Date.now() });
+  },
+});
+
+export const lockDataset = mutation({
+  args: { datasetId: v.id("evalDatasets") },
+  handler: async (ctx, { datasetId }) => {
+    await ctx.db.patch(datasetId, {
+      locked: true,
+      lockedAt: Date.now(),
+      reviewedAt: Date.now(),
+    });
+  },
+});
+
+export const unlockDataset = mutation({
+  args: { datasetId: v.id("evalDatasets") },
+  handler: async (ctx, { datasetId }) => {
+    await ctx.db.patch(datasetId, { locked: false });
   },
 });
 

@@ -5,6 +5,7 @@ import { internalAction } from "./_generated/server";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { getModel } from "./models";
 import { buildClassificationSystemPrompt } from "./prompts";
@@ -48,6 +49,7 @@ function providerModel(modelId: string) {
   const cfg = getModel(modelId);
   if (cfg.provider === "openai") return openai(cfg.apiModel);
   if (cfg.provider === "anthropic") return anthropic(cfg.apiModel);
+  if (cfg.provider === "google") return google(cfg.apiModel);
   throw new Error(`Unsupported provider for model ${modelId}`);
 }
 
