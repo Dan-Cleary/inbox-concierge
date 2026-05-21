@@ -1,16 +1,36 @@
 import { useConvexAuth } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useEffect, useState } from "react";
 import InboxView from "./pages/InboxView";
 import AtriumMark from "./components/AtriumMark";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { signIn } = useAuthActions();
+  const [reviewerSigningIn, setReviewerSigningIn] = useState(false);
 
-  if (isLoading) {
+  // Reviewer-link mode: ?reviewer=<secret> auto-signs the visitor in as
+  // the designated reviewer user. Strip the param after attempting so
+  // the secret doesn't sit in the URL bar (or get bookmarked).
+  useEffect(() => {
+    if (isLoading || isAuthenticated || reviewerSigningIn) return;
+    const url = new URL(window.location.href);
+    const secret = url.searchParams.get("reviewer");
+    if (!secret) return;
+    setReviewerSigningIn(true);
+    url.searchParams.delete("reviewer");
+    window.history.replaceState({}, "", url.toString());
+    void signIn("reviewer", { secret }).catch(() => {
+      setReviewerSigningIn(false);
+    });
+  }, [isLoading, isAuthenticated, reviewerSigningIn, signIn]);
+
+  if (isLoading || reviewerSigningIn) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="kicker">Loading</p>
+        <p className="kicker">
+          {reviewerSigningIn ? "Signing in as reviewer" : "Loading"}
+        </p>
       </div>
     );
   }

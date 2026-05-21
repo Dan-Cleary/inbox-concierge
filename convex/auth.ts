@@ -1,5 +1,7 @@
 import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
+import { ConvexCredentials } from "@convex-dev/auth/providers/ConvexCredentials";
+import type { Id } from "./_generated/dataModel";
 
 const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 
@@ -34,6 +36,27 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           gmailExpiresAt: tokens.expires_at,
           gmailScope: tokens.scope,
         } as never;
+      },
+    }),
+    // Reviewer-link sign-in. The take-home reviewer can't enroll as a
+    // Google OAuth test user (we don't have their emails), so a magic-
+    // link mode lets them sign in as a designated demo user (typically
+    // Dan's own account) when they hit the app with ?reviewer=<secret>.
+    //
+    // Two env vars on the deployment, both required for the path to work:
+    //   REVIEWER_SECRET   — the magic value embedded in the link
+    //   REVIEWER_USER_ID  — the user document id to log them in as
+    // If either is unset, sign-in fails closed (returns null).
+    ConvexCredentials({
+      id: "reviewer",
+      authorize: async (credentials) => {
+        const expected = process.env.REVIEWER_SECRET;
+        const userId = process.env.REVIEWER_USER_ID as
+          | Id<"users">
+          | undefined;
+        if (!expected || !userId) return null;
+        if (credentials?.secret !== expected) return null;
+        return { userId };
       },
     }),
   ],
