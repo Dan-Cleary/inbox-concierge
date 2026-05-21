@@ -370,10 +370,7 @@ function Sidebar({
           <h3 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
             Labels
           </h3>
-          <div className="flex items-center gap-1.5">
-            <LabelCapacityBadge />
-            <CreateLabelButton />
-          </div>
+          <CreateLabelButton />
         </div>
       <nav className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
         <BucketRow
@@ -465,26 +462,6 @@ function StatsBar({
         <p className="mt-2 text-red-600">{stats.failed} failed</p>
       )}
     </div>
-  );
-}
-
-function LabelCapacityBadge() {
-  const capacity = useQuery(api.inbox.labelCapacity);
-  if (!capacity) return null;
-  const atCap = capacity.used >= capacity.max;
-  return (
-    <span
-      className={`text-[10px] tabular-nums ${
-        atCap ? "font-semibold text-amber-600" : "text-neutral-400"
-      }`}
-      title={
-        atCap
-          ? "You've hit the label cap. Delete one to make room."
-          : `${capacity.max - capacity.used} more available`
-      }
-    >
-      {capacity.used} / {capacity.max}
-    </span>
   );
 }
 
