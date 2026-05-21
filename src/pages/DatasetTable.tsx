@@ -3,8 +3,10 @@ import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { labelColorFor } from "../lib/roomNames";
+import Select from "../components/Select";
 
 const BUCKETS = ["Important", "Can wait", "Auto-archive", "Newsletter"] as const;
+type DefaultBucket = (typeof BUCKETS)[number];
 
 export default function DatasetTable({
   datasetId,
@@ -31,7 +33,6 @@ export default function DatasetTable({
           </thead>
           <tbody className="divide-y divide-[var(--rule-soft)]">
             {emails.map((e) => {
-              const color = labelColorFor(e.expectedBucket, 0);
               return (
                 <tr key={e._id}>
                   <td className="px-3 py-3 align-top text-[12px] text-[var(--mute)]">
@@ -51,34 +52,26 @@ export default function DatasetTable({
                     )}
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-2 w-2 shrink-0"
-                        style={{ background: color }}
-                      />
-                      <select
-                        value={e.expectedBucket}
-                        disabled={busyId === e._id}
-                        onChange={async (ev) => {
-                          setBusyId(e._id);
-                          try {
-                            await updateEmail({
-                              emailId: e._id,
-                              expectedBucket: ev.target.value,
-                            });
-                          } finally {
-                            setBusyId(null);
-                          }
-                        }}
-                        className="min-w-0 border-b border-[var(--rule)] bg-transparent px-1 py-0.5 text-[12px] text-[var(--ink)] focus:outline-none focus:border-[var(--moss)]"
-                      >
-                        {BUCKETS.map((b) => (
-                          <option key={b} value={b}>
-                            {b}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <Select<DefaultBucket>
+                      value={e.expectedBucket as DefaultBucket}
+                      disabled={busyId === e._id}
+                      options={BUCKETS.map((b) => ({
+                        value: b,
+                        label: b,
+                        color: labelColorFor(b, 0),
+                      }))}
+                      onChange={async (next) => {
+                        setBusyId(e._id);
+                        try {
+                          await updateEmail({
+                            emailId: e._id,
+                            expectedBucket: next,
+                          });
+                        } finally {
+                          setBusyId(null);
+                        }
+                      }}
+                    />
                   </td>
                 </tr>
               );

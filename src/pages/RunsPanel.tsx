@@ -6,6 +6,7 @@ import RunDetail from "./RunDetail";
 import CostAccuracyChart from "./CostAccuracyChart";
 import PromptEditor from "./PromptEditor";
 import { roomNameFor } from "../lib/roomNames";
+import Select from "../components/Select";
 
 type ModelInfo = {
   id: string;
@@ -141,28 +142,23 @@ export default function RunsPanel({
         </div>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex flex-1 items-center gap-2">
-            <span className="shrink-0 text-sm font-medium text-neutral-600">
-              Prompt:
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--mute)]">
+              Prompt
             </span>
-            <select
+            <Select
               value={selectedPromptVersionId ?? ""}
-              onChange={(e) =>
+              onChange={(next) =>
                 setSelectedPromptVersionId(
-                  (e.target.value || null) as Id<"promptVersions"> | null,
+                  (next || null) as Id<"promptVersions"> | null,
                 )
               }
-              className="min-w-0 flex-1 border border-[var(--rule)] bg-[var(--bg)] px-2 py-1 text-[12px] sm:flex-none"
-            >
-              {(promptVersions ?? []).length === 0 && (
-                <option value="">latest (will seed on first run)</option>
-              )}
-              {(promptVersions ?? []).map((p, i) => (
-                <option key={p._id} value={p._id}>
-                  {p.label}
-                  {i === 0 ? " (latest)" : ""}
-                </option>
-              ))}
-            </select>
+              placeholder="latest"
+              options={(promptVersions ?? []).map((p, i) => ({
+                value: p._id as string,
+                label: p.label,
+                hint: i === 0 ? "latest" : undefined,
+              }))}
+            />
             <button
               type="button"
               onClick={() => setPromptEditorOpen(true)}

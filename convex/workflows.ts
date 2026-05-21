@@ -9,7 +9,7 @@ const workflow = new WorkflowManager(components.workflow);
 
 const BATCH_SIZE = 10;
 const BATCH_CONCURRENCY = 3;
-const DEFAULT_MODEL = "claude-haiku-4-5";
+const DEFAULT_MODEL = "gpt-5.4-mini";
 
 // Durable classification workflow. Splits the email set into batches of
 // BATCH_SIZE and runs BATCH_CONCURRENCY batches in parallel so a long
