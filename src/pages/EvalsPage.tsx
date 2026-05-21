@@ -47,9 +47,13 @@ export default function EvalsPage() {
         <div className="min-w-0">
           <h2 className="text-xl font-semibold">Evals</h2>
           <p className="truncate text-xs text-neutral-500">
-            {currentDataset.version} ·{" "}
+            Dataset generated{" "}
             <span className="font-medium text-neutral-700">
-              generator: {currentDataset.generatorModel ?? "unknown"}
+              {formatGeneratedAt(currentDataset.generatedAt)}
+            </span>{" "}
+            by{" "}
+            <span className="font-medium text-neutral-700">
+              {currentDataset.generatorModel ?? "unknown model"}
             </span>
           </p>
         </div>
@@ -102,6 +106,15 @@ export default function EvalsPage() {
       {tab === "bench" && <RunsPanel datasetId={currentDataset._id} />}
     </div>
   );
+}
+
+function formatGeneratedAt(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function TabButton({
