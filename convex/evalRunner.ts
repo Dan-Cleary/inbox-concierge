@@ -1,7 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { DEFAULT_BUCKETS } from "./prompts";
 import type { ClassifyBatchResult } from "./classify";
@@ -9,9 +9,13 @@ import type { Id } from "./_generated/dataModel";
 
 const BATCH_SIZE = 10;
 
-// Launch one eval run per selected model. Each model classifies the entire
-// dataset in batches of 10 emails. Results land in evalRunResults and the
-// aggregate row in evalRuns. Returns the run ids so the UI can subscribe.
+// Public: fire-and-forget. Resolve the prompt template + bucket set, create
+// one evalRuns row per model in "running" state, then schedule each model's
+// actual work as a background internal action. Returns immediately so the
+// websocket doesn't hang while 7 models classify in parallel.
+//
+// The UI subscribes to listRuns and watches rows flip from "running" to
+// "completed" / "failed" as each background action finishes.
 export const runBench = action({
   args: {
     datasetId: v.id("evalDatasets"),
@@ -30,7 +34,8 @@ export const runBench = action({
       throw new Error("Dataset is empty");
     }
 
-    // Resolve the prompt version: explicit id, else latest, else seed default.
+    // Resolve the prompt version once for all models in this bench so they
+    // all run against the same template.
     let promptVersionId = args.promptVersionId ?? null;
     let promptTemplate: string | undefined;
     if (promptVersionId) {
@@ -51,114 +56,138 @@ export const runBench = action({
       }
     }
 
+    // Create the "running" rows synchronously so the UI sees them appear
+    // the instant Run bench is clicked.
     const runIds: Id<"evalRuns">[] = [];
+    for (const modelId of args.modelIds) {
+      const runId: Id<"evalRuns"> = await ctx.runMutation(
+        internal.evalsDb.startRun,
+        {
+          datasetId: args.datasetId,
+          model: modelId,
+          promptVersionId: promptVersionId ?? undefined,
+        },
+      );
+      runIds.push(runId);
+      // Schedule the actual classification work as a separate background
+      // action — the parent action returns without waiting for it.
+      await ctx.scheduler.runAfter(0, internal.evalRunner.runOneModel, {
+        runId,
+        datasetId: args.datasetId,
+        modelId,
+        promptTemplate,
+      });
+    }
+    return { runIds };
+  },
+});
 
-    // One run per model, but run all models concurrently.
-    await Promise.all(
-      args.modelIds.map(async (modelId): Promise<void> => {
-        const runId: Id<"evalRuns"> = await ctx.runMutation(
-          internal.evalsDb.startRun,
-          {
-            datasetId: args.datasetId,
-            model: modelId,
-            promptVersionId: promptVersionId ?? undefined,
-          },
-        );
-        runIds.push(runId);
+// Internal: classify the entire dataset with one model and write aggregate
+// + per-email results. Runs in the background so the parent runBench action
+// can return immediately.
+export const runOneModel = internalAction({
+  args: {
+    runId: v.id("evalRuns"),
+    datasetId: v.id("evalDatasets"),
+    modelId: v.string(),
+    promptTemplate: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    try {
+      const dataset = (await ctx.runQuery(
+        internal.evalsDb.getDatasetEmailsInternal,
+        { datasetId: args.datasetId },
+      )) as Array<{
+        _id: Id<"evalDatasetEmails">;
+        subject: string;
+        from: string;
+        snippet: string;
+        expectedBucket: string;
+      }>;
 
-        try {
-          // Split into batches.
-          const batches: typeof dataset[] = [];
-          for (let i = 0; i < dataset.length; i += BATCH_SIZE) {
-            batches.push(dataset.slice(i, i + BATCH_SIZE));
-          }
+      const batches: typeof dataset[] = [];
+      for (let i = 0; i < dataset.length; i += BATCH_SIZE) {
+        batches.push(dataset.slice(i, i + BATCH_SIZE));
+      }
 
-          // Run batches sequentially for a given model (rate-limit friendly);
-          // models are still parallel with each other above.
-          const allResults: {
-            datasetEmailId: Id<"evalDatasetEmails">;
-            predictedBucket: string;
-            expectedBucket: string;
-            correct: boolean;
-            reason?: string;
-            latencyMs: number;
-          }[] = [];
-          let totalLatencyMs = 0;
-          let totalCostUsd = 0;
-          let batchCount = 0;
+      const allResults: {
+        datasetEmailId: Id<"evalDatasetEmails">;
+        predictedBucket: string;
+        expectedBucket: string;
+        correct: boolean;
+        reason?: string;
+        latencyMs: number;
+      }[] = [];
+      let totalLatencyMs = 0;
+      let totalCostUsd = 0;
+      let batchCount = 0;
 
-          for (const batch of batches) {
-            const res = (await ctx.runAction(
-              internal.classify.classifyBatch,
-              {
-                modelId,
-                buckets: DEFAULT_BUCKETS.map((b) => ({
-                  name: b.name,
-                  description: b.description,
-                })),
-                emails: batch.map((e) => ({
-                  id: e._id,
-                  subject: e.subject,
-                  from: e.from,
-                  snippet: e.snippet,
-                })),
-                promptTemplate,
-              },
-            )) as ClassifyBatchResult;
-            totalLatencyMs += res.latencyMs;
-            totalCostUsd += res.costUsd;
-            batchCount += 1;
+      // Sequential batches per model (LLM rate-limit friendly); models are
+      // already parallel across each other via separate scheduled actions.
+      for (const batch of batches) {
+        const res = (await ctx.runAction(internal.classify.classifyBatch, {
+          modelId: args.modelId,
+          buckets: DEFAULT_BUCKETS.map((b) => ({
+            name: b.name,
+            description: b.description,
+          })),
+          emails: batch.map((e) => ({
+            id: e._id,
+            subject: e.subject,
+            from: e.from,
+            snippet: e.snippet,
+          })),
+          promptTemplate: args.promptTemplate,
+        })) as ClassifyBatchResult;
+        totalLatencyMs += res.latencyMs;
+        totalCostUsd += res.costUsd;
+        batchCount += 1;
 
-            const byId = new Map(res.predictions.map((p) => [p.id, p]));
-            for (const e of batch) {
-              const p = byId.get(e._id);
-              const predictedBucket = p?.bucket ?? "(no prediction)";
-              allResults.push({
-                datasetEmailId: e._id,
-                predictedBucket,
-                expectedBucket: e.expectedBucket,
-                correct: predictedBucket === e.expectedBucket,
-                reason: p?.reason,
-                latencyMs: res.latencyMs / batch.length,
-              });
-            }
-          }
-
-          // Aggregate.
-          const correct = allResults.filter((r) => r.correct).length;
-          const accuracy = correct / allResults.length;
-          const perBucketAccuracy: Record<string, number> = {};
-          for (const b of DEFAULT_BUCKETS) {
-            const inBucket = allResults.filter(
-              (r) => r.expectedBucket === b.name,
-            );
-            perBucketAccuracy[b.name] =
-              inBucket.length === 0
-                ? 0
-                : inBucket.filter((r) => r.correct).length / inBucket.length;
-          }
-
-          await ctx.runMutation(internal.evalsDb.writeRunResults, {
-            runId,
-            results: allResults,
-          });
-          await ctx.runMutation(internal.evalsDb.completeRun, {
-            runId,
-            accuracy,
-            perBucketAccuracy,
-            avgLatencyMs: totalLatencyMs / batchCount,
-            totalCostUsd,
-          });
-        } catch (err) {
-          await ctx.runMutation(internal.evalsDb.failRun, {
-            runId,
-            error: err instanceof Error ? err.message : String(err),
+        const byId = new Map(res.predictions.map((p) => [p.id, p]));
+        for (const e of batch) {
+          const p = byId.get(e._id);
+          const predictedBucket = p?.bucket ?? "(no prediction)";
+          allResults.push({
+            datasetEmailId: e._id,
+            predictedBucket,
+            expectedBucket: e.expectedBucket,
+            correct: predictedBucket === e.expectedBucket,
+            reason: p?.reason,
+            latencyMs: res.latencyMs / batch.length,
           });
         }
-      }),
-    );
+      }
 
-    return { runIds };
+      const correct = allResults.filter((r) => r.correct).length;
+      const accuracy = allResults.length === 0 ? 0 : correct / allResults.length;
+      const perBucketAccuracy: Record<string, number> = {};
+      for (const b of DEFAULT_BUCKETS) {
+        const inBucket = allResults.filter(
+          (r) => r.expectedBucket === b.name,
+        );
+        perBucketAccuracy[b.name] =
+          inBucket.length === 0
+            ? 0
+            : inBucket.filter((r) => r.correct).length / inBucket.length;
+      }
+
+      await ctx.runMutation(internal.evalsDb.writeRunResults, {
+        runId: args.runId,
+        results: allResults,
+      });
+      await ctx.runMutation(internal.evalsDb.completeRun, {
+        runId: args.runId,
+        accuracy,
+        perBucketAccuracy,
+        avgLatencyMs: batchCount === 0 ? 0 : totalLatencyMs / batchCount,
+        totalCostUsd,
+      });
+    } catch (err) {
+      await ctx.runMutation(internal.evalsDb.failRun, {
+        runId: args.runId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   },
 });
 

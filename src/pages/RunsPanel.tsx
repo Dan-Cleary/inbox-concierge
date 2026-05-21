@@ -97,27 +97,46 @@ export default function RunsPanel({
       <div className="rounded-md border border-neutral-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-neutral-600">Models:</span>
-          {models.map((m) => (
-            <label
-              key={m.id}
-              className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs"
-            >
-              <input
-                type="checkbox"
-                checked={selectedModels.has(m.id)}
-                onChange={(e) => {
-                  const next = new Set(selectedModels);
-                  if (e.target.checked) next.add(m.id);
-                  else next.delete(m.id);
-                  setSelectedModels(next);
-                }}
-              />
-              <span className="font-medium">{m.label}</span>
-              <span className="text-neutral-400">
-                ${m.inputUsdPerM}/${m.outputUsdPerM} per M
-              </span>
-            </label>
-          ))}
+          {models.map((m) => {
+            const checked = selectedModels.has(m.id);
+            return (
+              <label
+                key={m.id}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  checked
+                    ? "border-neutral-900 bg-neutral-900 text-white"
+                    : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400"
+                }`}
+                title={`${m.label} · $${m.inputUsdPerM}/$${m.outputUsdPerM} per 1M tokens`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => {
+                    const next = new Set(selectedModels);
+                    if (e.target.checked) next.add(m.id);
+                    else next.delete(m.id);
+                    setSelectedModels(next);
+                  }}
+                  className="sr-only"
+                />
+                {checked && (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3 w-3"
+                  >
+                    <path d="M5 12l5 5L20 7" />
+                  </svg>
+                )}
+                {m.label}
+              </label>
+            );
+          })}
         </div>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex flex-1 items-center gap-2">
