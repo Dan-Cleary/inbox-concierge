@@ -68,7 +68,7 @@ const listLabels = createTool({
 
 export const inboxAgent = new Agent(components.agent, {
   name: "Inbox Concierge Agent",
-  languageModel: anthropic.chat("claude-sonnet-4-6"),
+  languageModel: anthropic.chat("claude-haiku-4-5"),
   embeddingModel: openai.embedding("text-embedding-3-small"),
   instructions: `You are a helpful assistant for the user's email inbox. The user has labels (e.g. "Important", "Can wait", "Auto-archive", "Newsletter") that an LLM classifier applied to their last 200 Gmail threads.
 
