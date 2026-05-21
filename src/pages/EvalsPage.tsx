@@ -44,19 +44,7 @@ export default function EvalsPage() {
   return (
     <div className="space-y-4">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold">Evals</h2>
-          <p className="truncate text-xs text-neutral-500">
-            Dataset generated{" "}
-            <span className="font-medium text-neutral-700">
-              {formatGeneratedAt(currentDataset.generatedAt)}
-            </span>{" "}
-            by{" "}
-            <span className="font-medium text-neutral-700">
-              {currentDataset.generatorModel ?? "unknown model"}
-            </span>
-          </p>
-        </div>
+        <h2 className="text-xl font-semibold">Evals</h2>
         {datasets.length > 1 && (
           <div className="flex flex-wrap gap-1">
             {datasets.map((d) => (
@@ -106,15 +94,6 @@ export default function EvalsPage() {
       {tab === "bench" && <RunsPanel datasetId={currentDataset._id} />}
     </div>
   );
-}
-
-function formatGeneratedAt(ms: number): string {
-  const d = new Date(ms);
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function TabButton({
