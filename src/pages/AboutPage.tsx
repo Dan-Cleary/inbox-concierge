@@ -35,12 +35,12 @@ export default function AboutPage() {
               label: "AI-native speed",
               body: "Used AI to build ~10× faster — and verified the output instead of trusting it.",
               evidence: [
-                "Speed: ~2 days, part-time, end-to-end with Claude Code + gstack skills (planning, design review, QA loops)",
-                "Verified — visible state: every LLM-assigned label renders on every email row so drift is observable, not buried in a confidence score",
-                "Verified — eval harness: locked GPT-5.5 dataset benchmarks every model on the same examples; cost-vs-accuracy scatter shipped in the app, not a notebook",
-                "Verified — tests: 66 vitest + convex-test cases cover bucket CRUD, the pending-changes accumulator, default-label guards, and label-cap enforcement",
-                "Verified — local CI gate: lint + build + test runs locally before every push (lesson learned the hard way)",
-                "Refined — every prompt change is checked against the locked dataset before merging; classifier prompts iterated 4-5 times this way",
+                "Built end-to-end in ~2 days, part-time, with Claude Code + gstack skills (planning, design review, QA loops)",
+                "Every LLM-assigned label renders on every email row so drift is observable, not buried in a confidence score",
+                "Eval harness with a locked GPT-5.5 dataset benchmarks every model on the same examples; cost-vs-accuracy scatter shipped in the app, not a notebook",
+                "66 vitest + convex-test cases cover bucket CRUD, the pending-changes accumulator, default-label guards, and label-cap enforcement",
+                "Lint + build + test runs locally before every push (lesson learned the hard way)",
+                "Every prompt change is checked against the locked dataset before merging; classifier prompts iterated 4-5 times this way",
               ],
             },
             {
@@ -156,14 +156,6 @@ export default function AboutPage() {
         body=""
       >
         <div className="space-y-5">
-          <Decision
-            title="Cut: write actions on Gmail (archive, label, reply)"
-            body="The spec is read-only, and write actions widen the OAuth scope, the consent screen, and the blast radius of a bug. The agent's tools mutate Convex state only. If this shipped for real, the next step is a 'sync labels back to Gmail' opt-in — but verify-the-classification UX first, then write."
-          />
-          <Decision
-            title="Cut: multi-account / shared inbox"
-            body="One Google account per Convex user. Multi-account would mean credentials as a list, a per-account picker in the UI, and a cross-account dedup story. Out of scope for a 2-day build, and a real product decision (do you merge inboxes or keep them separate?) not just engineering."
-          />
           <Decision
             title="Cut: per-bucket prompt overrides"
             body="The classifier prompt is one global system prompt. A real version would let power users tweak the description of 'Important' for their domain (e.g. a fundraiser vs. a recruiter) and re-eval against the dataset. The eval harness is the half I built; the per-user override is the half I didn't."
