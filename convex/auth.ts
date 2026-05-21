@@ -1,3 +1,8 @@
+// Reads REVIEWER_SECRET / REVIEWER_USER_ID via process.env (Convex Node
+// runtime). Same shim as convex/gmail.ts — the convex tsconfig has node
+// types but the frontend's transitive check of api.d.ts doesn't.
+declare const process: { env: Record<string, string | undefined> };
+
 import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
 import { ConvexCredentials } from "@convex-dev/auth/providers/ConvexCredentials";
