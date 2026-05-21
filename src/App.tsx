@@ -16,8 +16,8 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto max-w-md pt-12 sm:pt-20">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm sm:p-10">
+      <div className="mx-auto flex min-h-[calc(100vh-12rem)] max-w-md items-center pt-8 sm:pt-12">
+        <div className="w-full rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm sm:p-10">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-900 text-white">
             <svg
               viewBox="0 0 24 24"

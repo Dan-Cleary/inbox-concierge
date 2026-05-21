@@ -1,6 +1,9 @@
+import { useConvexAuth } from "convex/react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 export default function Layout() {
+  const { isAuthenticated } = useConvexAuth();
+
   return (
     <div className="flex min-h-full flex-col bg-neutral-50">
       <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/90 backdrop-blur">
@@ -12,10 +15,15 @@ export default function Layout() {
             <Logo />
             <span>Inbox Concierge</span>
           </Link>
-          <nav className="flex gap-1 text-sm">
-            <TabLink to="/">Inbox</TabLink>
-            <TabLink to="/evals">Evals</TabLink>
-          </nav>
+          {/* Nav is only meaningful once signed in — hiding it on the
+              landing page keeps the sign-in card the unambiguous focal
+              point. */}
+          {isAuthenticated && (
+            <nav className="flex gap-1 text-sm">
+              <TabLink to="/">Inbox</TabLink>
+              <TabLink to="/evals">Evals</TabLink>
+            </nav>
+          )}
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6">

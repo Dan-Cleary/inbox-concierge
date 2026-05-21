@@ -119,34 +119,38 @@ export default function RunsPanel({
             </label>
           ))}
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-neutral-600">Prompt:</span>
-          <select
-            value={selectedPromptVersionId ?? ""}
-            onChange={(e) =>
-              setSelectedPromptVersionId(
-                (e.target.value || null) as Id<"promptVersions"> | null,
-              )
-            }
-            className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
-          >
-            {(promptVersions ?? []).length === 0 && (
-              <option value="">latest (will seed on first run)</option>
-            )}
-            {(promptVersions ?? []).map((p, i) => (
-              <option key={p._id} value={p._id}>
-                {p.label}
-                {i === 0 ? " (latest)" : ""}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => setPromptEditorOpen(true)}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
-          >
-            Edit prompt
-          </button>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex flex-1 items-center gap-2">
+            <span className="shrink-0 text-sm font-medium text-neutral-600">
+              Prompt:
+            </span>
+            <select
+              value={selectedPromptVersionId ?? ""}
+              onChange={(e) =>
+                setSelectedPromptVersionId(
+                  (e.target.value || null) as Id<"promptVersions"> | null,
+                )
+              }
+              className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs sm:flex-none"
+            >
+              {(promptVersions ?? []).length === 0 && (
+                <option value="">latest (will seed on first run)</option>
+              )}
+              {(promptVersions ?? []).map((p, i) => (
+                <option key={p._id} value={p._id}>
+                  {p.label}
+                  {i === 0 ? " (latest)" : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setPromptEditorOpen(true)}
+              className="shrink-0 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              Edit
+            </button>
+          </div>
           <button
             type="button"
             disabled={running || selectedModels.size === 0}
@@ -165,7 +169,7 @@ export default function RunsPanel({
                 setRunning(false);
               }
             }}
-            className="ml-auto rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            className="w-full shrink-0 rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 sm:ml-auto sm:w-auto"
           >
             {running ? "Running…" : "Run bench"}
           </button>
@@ -237,7 +241,9 @@ export default function RunsPanel({
                       : ""
                   }
                 >
-                  <td className="px-3 py-2 font-medium">{r.model}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium">
+                    {r.model}
+                  </td>
                   <td className="px-3 py-2 text-xs text-neutral-500">
                     {r.promptVersionId
                       ? (promptVersionLabelById.get(r.promptVersionId) ??

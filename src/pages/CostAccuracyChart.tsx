@@ -53,6 +53,17 @@ export default function CostAccuracyChart({ points }: { points: Point[] }) {
   const yPad = Math.max(2, (maxAcc - minAcc) * 0.2);
   const yDomain = [Math.max(0, Math.floor(minAcc - yPad)), Math.min(100, Math.ceil(maxAcc + yPad))];
 
+  // Build log-scale ticks at every decade between min and max so the user
+  // can read where each model sits — endpoint-only ticks make clustering
+  // invisible (e.g. $0.0014 and $0.38 with no middle stops).
+  const xTicks: number[] = [];
+  const lo = Math.floor(Math.log10(minCost));
+  const hi = Math.ceil(Math.log10(maxCost));
+  for (let i = lo; i <= hi; i++) {
+    const tick = Math.pow(10, i);
+    if (tick >= xDomain[0] && tick <= xDomain[1]) xTicks.push(tick);
+  }
+
   return (
     <div className="rounded-md border border-neutral-200 bg-white p-4">
       <div className="flex items-baseline justify-between">
@@ -70,6 +81,7 @@ export default function CostAccuracyChart({ points }: { points: Point[] }) {
               dataKey="cost"
               scale="log"
               domain={xDomain}
+              ticks={xTicks}
               tickFormatter={(v: number) =>
                 v < 0.01
                   ? `$${v.toFixed(4)}`
