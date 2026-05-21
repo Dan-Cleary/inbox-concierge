@@ -47,9 +47,8 @@ export default function RunsPanel({
   const listModels = useAction(api.evalRunner.listModels);
   const [models, setModels] = useState<ModelInfo[] | null>(null);
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
-  const [selectedPromptVersionId, setSelectedPromptVersionId] = useState<
-    Id<"promptVersions"> | null
-  >(null);
+  const [explicitlySelectedPromptVersionId, setSelectedPromptVersionId] =
+    useState<Id<"promptVersions"> | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRun, setExpandedRun] = useState<Id<"evalRuns"> | null>(null);
@@ -67,15 +66,12 @@ export default function RunsPanel({
     })();
   }, [listModels]);
 
-  // Default the prompt selector to the latest version once they load.
-  useEffect(() => {
-    if (selectedPromptVersionId || !promptVersions || promptVersions.length === 0) {
-      return;
-    }
-    setSelectedPromptVersionId(promptVersions[0]._id);
-  }, [promptVersions, selectedPromptVersionId]);
-
   if (runs === undefined || models === null) return null;
+
+  // Default the prompt selector to the latest version when the user hasn't
+  // explicitly picked one. Derived in render so we don't setState in effect.
+  const selectedPromptVersionId: Id<"promptVersions"> | null =
+    explicitlySelectedPromptVersionId ?? promptVersions?.[0]?._id ?? null;
 
   const promptVersionLabelById = new Map(
     (promptVersions ?? []).map((p) => [p._id, p.label]),

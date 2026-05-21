@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 
 const DEFAULT_TEMPLATE = `You classify emails into exactly one of the user's buckets.
@@ -27,27 +27,26 @@ export default function PromptEditor({
   open: boolean;
   onClose: () => void;
 }) {
+  if (!open) return null;
+  // Mounted/unmounted on open toggle, so the form sub-component picks up
+  // the latest values via useState initializers on each open. Avoids the
+  // setState-in-effect anti-pattern.
+  return <PromptEditorForm onClose={onClose} />;
+}
+
+function PromptEditorForm({ onClose }: { onClose: () => void }) {
   const versions = useQuery(api.promptVersions.list);
   const create = useMutation(api.promptVersions.create);
 
   const latest = versions?.[0];
-  const [label, setLabel] = useState("");
-  const [template, setTemplate] = useState("");
+  const versionCount = versions?.length ?? 0;
+  const [label, setLabel] = useState(() => `v${versionCount + 1}`);
+  const [template, setTemplate] = useState(
+    () => latest?.template ?? DEFAULT_TEMPLATE,
+  );
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setTemplate(latest?.template ?? DEFAULT_TEMPLATE);
-    setLabel(
-      latest ? `v${(versions?.length ?? 0) + 1}` : "v1",
-    );
-    setNotes("");
-    setError(null);
-  }, [open, latest, versions?.length]);
-
-  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-6">
@@ -106,8 +105,7 @@ export default function PromptEditor({
         </div>
         <footer className="flex items-center justify-between border-t border-neutral-200 px-5 py-3">
           <div className="text-xs text-neutral-500">
-            {versions?.length ?? 0} saved version
-            {versions?.length === 1 ? "" : "s"}
+            {versionCount} saved version{versionCount === 1 ? "" : "s"}
           </div>
           <div className="flex gap-2">
             <button
@@ -125,7 +123,7 @@ export default function PromptEditor({
                 setError(null);
                 try {
                   await create({
-                    label: label.trim() || `v${(versions?.length ?? 0) + 1}`,
+                    label: label.trim() || `v${versionCount + 1}`,
                     template,
                     notes: notes.trim() || undefined,
                   });

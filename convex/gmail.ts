@@ -118,23 +118,38 @@ export const refreshAccessToken = internalAction({
   },
 });
 
-// Get a valid access_token for the user, refreshing it if expired or close
-// to expiring. Returns null if the user has no credentials at all.
-async function getValidAccessToken(
+// Get a valid Gmail access_token for the user, refreshing via the stored
+// refresh_token when the current one is close to expiring. Throws if the
+// user has no credentials at all (which means they need to re-auth).
+//
+// Exported so any action that hits the Gmail API can share one refresh path.
+// ctx is intentionally typed loosely — both V8 and Node action contexts call
+// this and they have slightly different generic shapes; what matters is that
+// runQuery/runAction exist with the expected behavior.
+export async function getValidAccessToken(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   userId: Id<"users">,
-): Promise<string | null> {
-  const creds = await ctx.runQuery(internal.gmail.getCredentialsForUser, {
+): Promise<string> {
+  const creds = (await ctx.runQuery(internal.gmail.getCredentialsForUser, {
     userId,
-  });
-  if (!creds) return null;
+  })) as {
+    accessToken: string;
+    expiresAt?: number;
+  } | null;
+  if (!creds) {
+    throw new Error(
+      "No Gmail credentials stored for user — sign out and sign in again.",
+    );
+  }
   const nowSec = Math.floor(Date.now() / 1000);
   const expiresAt = creds.expiresAt ?? 0;
   if (expiresAt - REFRESH_SAFETY_WINDOW_SEC > nowSec) {
     return creds.accessToken;
   }
-  return await ctx.runAction(internal.gmail.refreshAccessToken, { userId });
+  return (await ctx.runAction(internal.gmail.refreshAccessToken, {
+    userId,
+  })) as string;
 }
 
 // ----- Gmail integration probe --------------------------------------------
@@ -166,8 +181,12 @@ export const probeFirstThread = action({
   ): Promise<{ subject: string; from: string; snippet: string } | null> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const accessToken = await getValidAccessToken(ctx, userId);
-    if (!accessToken) return null;
+    let accessToken: string;
+    try {
+      accessToken = await getValidAccessToken(ctx, userId);
+    } catch {
+      return null;
+    }
 
     const listRes = await fetch(
       "https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=1",

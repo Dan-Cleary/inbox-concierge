@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import DatasetTable from "./DatasetTable";
@@ -11,17 +11,18 @@ export default function EvalsPage() {
   const datasets = useQuery(api.evalsDb.listDatasets);
   const deleteDataset = useMutation(api.evalsDb.deleteDataset);
 
-  const [selected, setSelected] = useState<Id<"evalDatasets"> | null>(null);
+  const [explicitlySelected, setSelected] = useState<Id<"evalDatasets"> | null>(
+    null,
+  );
   const [tab, setTab] = useState<Tab>("bench");
-
-  useEffect(() => {
-    if (selected || !datasets || datasets.length === 0) return;
-    setSelected(datasets[0]._id);
-  }, [datasets, selected]);
 
   if (datasets === undefined) {
     return <p className="text-sm text-neutral-500">Loading…</p>;
   }
+  // Default to the newest dataset when the user hasn't picked one yet. Derive
+  // this in render so we avoid a setState-in-effect dance.
+  const selected: Id<"evalDatasets"> | null =
+    explicitlySelected ?? datasets[0]?._id ?? null;
 
   if (datasets.length === 0) {
     return (

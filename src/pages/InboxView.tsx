@@ -1,9 +1,8 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
-import { useCallback, useEffect, useState as useStateExtra } from "react";
 import BucketCreator from "./BucketCreator";
 import BucketSuggestions from "./BucketSuggestions";
 import ChatSidebar from "./ChatSidebar";
@@ -66,8 +65,8 @@ export default function InboxView() {
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useStateExtra(false);
-  const [highlightedEmailId, setHighlightedEmailId] = useStateExtra<
+  const [chatOpen, setChatOpen] = useState(false);
+  const [highlightedEmailId, setHighlightedEmailId] = useState<
     Id<"emails"> | null
   >(null);
 

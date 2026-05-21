@@ -10,6 +10,7 @@ import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
 import { DEFAULT_BUCKETS } from "./prompts";
+import { getValidAccessToken } from "./gmail";
 
 // ----- Buckets -------------------------------------------------------------
 
@@ -451,21 +452,6 @@ async function fetchThreadMetadata(
     to,
     date: Number.isFinite(dateMs) ? dateMs : Date.now(),
   };
-}
-
-async function getValidAccessToken(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ctx: any,
-  userId: Id<"users">,
-): Promise<string> {
-  const creds = await ctx.runQuery(internal.gmail.getCredentialsForUser, {
-    userId,
-  });
-  if (!creds) throw new Error("No Gmail credentials stored for user");
-  const nowSec = Math.floor(Date.now() / 1000);
-  const expiresAt = creds.expiresAt ?? 0;
-  if (expiresAt - 5 * 60 > nowSec) return creds.accessToken;
-  return await ctx.runAction(internal.gmail.refreshAccessToken, { userId });
 }
 
 // Pull the last `maxThreads` Gmail threads for the signed-in user. Returns
