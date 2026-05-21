@@ -13,23 +13,31 @@ export default function ChatSidebar({
   onCitationClick?: (emailId: Id<"emails">) => void;
 }) {
   const messages = useQuery(api.chatDb.listMessages);
+  const me = useQuery(api.inbox.currentUser);
   const ask = useAction(api.chat.askInbox);
   const clearChat = useMutation(api.chatDb.clearChat);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Auto-scroll on new messages or while streaming.
   useEffect(() => {
     if (!open || !scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, open]);
 
+  // Autosize the textarea up to a max so multi-line questions feel natural.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }, [input]);
+
   if (!open) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
     const q = input.trim();
     if (!q || submitting) return;
     setInput("");
@@ -45,112 +53,134 @@ export default function ChatSidebar({
   };
 
   const empty = !messages || messages.length === 0;
+  const firstName = (me?.name ?? "").trim().split(/\s+/)[0] || "there";
 
   return (
     <>
-      {/* Mobile backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+        className="fixed inset-0 z-40 bg-black/20 lg:hidden"
         onClick={onClose}
       />
       <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-neutral-200 bg-white shadow-2xl">
-        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <div>
-            <h3 className="text-sm font-semibold">Ask your inbox</h3>
-            <p className="text-xs text-neutral-500">
-              Search across your 200 threads with natural language.
-            </p>
-          </div>
-          <div className="flex items-center gap-1">
-            {!empty && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm("Clear all messages?")) clearChat();
-                }}
-                className="rounded p-1 text-xs text-neutral-500 hover:bg-neutral-100"
-                title="Clear chat"
-              >
-                Clear
-              </button>
-            )}
+        <header className="flex items-center justify-between px-4 py-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (empty) return;
+              if (confirm("Start a new chat? This clears your history.")) {
+                clearChat();
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-neutral-800 hover:bg-neutral-100"
+          >
+            New chat
+            <ChevronDown />
+          </button>
+          <div className="flex items-center gap-1 text-neutral-400">
             <button
               type="button"
               onClick={onClose}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+              className="rounded p-1.5 hover:bg-neutral-100 hover:text-neutral-700"
               aria-label="Close chat"
             >
-              ✕
+              <CloseIcon />
             </button>
           </div>
         </header>
 
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
+          className="flex-1 overflow-y-auto px-5 pb-3"
         >
           {empty ? (
-            <ExamplePrompts onPick={(p) => setInput(p)} />
+            <EmptyState
+              firstName={firstName}
+              onPick={(p) => {
+                setInput(p);
+                inputRef.current?.focus();
+              }}
+            />
           ) : (
-            messages.map((m) => (
-              <MessageBubble
-                key={m._id}
-                message={m}
-                onCitationClick={onCitationClick}
-              />
-            ))
+            <div className="space-y-4 pt-2">
+              {messages.map((m) => (
+                <MessageBubble
+                  key={m._id}
+                  message={m}
+                  onCitationClick={onCitationClick}
+                />
+              ))}
+            </div>
           )}
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="border-t border-neutral-200 p-3"
-        >
+        <div className="px-4 pb-4 pt-2">
           {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
-          <div className="flex gap-2">
-            <input
-              type="text"
+          <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm transition-colors focus-within:border-neutral-400">
+            <textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="What's in my inbox from Stripe?"
-              className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
+              placeholder="Ask a question"
+              rows={1}
               disabled={submitting}
+              className="block w-full resize-none rounded-2xl border-0 bg-transparent px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
             />
-            <button
-              type="submit"
-              disabled={!input.trim() || submitting}
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-            >
-              Ask
-            </button>
+            <div className="flex items-center justify-end gap-1 px-2 pb-2">
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!input.trim() || submitting}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white transition-opacity hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400"
+                aria-label="Send"
+              >
+                {submitting ? <Spinner /> : <ArrowUp />}
+              </button>
+            </div>
           </div>
-        </form>
+        </div>
       </aside>
     </>
   );
 }
 
-const EXAMPLES = [
-  "What did Sentry say recently?",
-  "Any cold sales emails this week?",
-  "Show me anything finance-related.",
-  "What needs a reply today?",
+const SUGGESTIONS: Array<{ icon: React.ReactNode; label: string }> = [
+  { icon: <SearchIcon />, label: "What's most important in my inbox right now?" },
+  { icon: <MailIcon />, label: "Show me anything from Sentry this week." },
+  { icon: <SparkleIcon />, label: "Are there any cold sales emails I can ignore?" },
+  { icon: <ClockIcon />, label: "What needs a reply today?" },
 ];
 
-function ExamplePrompts({ onPick }: { onPick: (s: string) => void }) {
+function EmptyState({
+  firstName,
+  onPick,
+}: {
+  firstName: string;
+  onPick: (s: string) => void;
+}) {
   return (
-    <div className="space-y-3 pt-4">
-      <p className="text-xs text-neutral-500">Try one of these:</p>
-      {EXAMPLES.map((e) => (
-        <button
-          key={e}
-          type="button"
-          onClick={() => onPick(e)}
-          className="block w-full rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-left text-sm text-neutral-700 hover:border-neutral-300 hover:bg-neutral-100"
-        >
-          {e}
-        </button>
-      ))}
+    <div className="pt-6">
+      <h2 className="text-xl font-semibold tracking-tight text-neutral-900">
+        Hi {firstName}, how can I help?
+      </h2>
+      <div className="mt-5 space-y-2">
+        {SUGGESTIONS.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => onPick(s.label)}
+            className="flex w-full items-center gap-3 rounded-full bg-neutral-50 px-4 py-3 text-left text-sm text-neutral-800 transition-colors hover:bg-neutral-100"
+          >
+            <span className="shrink-0 text-neutral-500">{s.icon}</span>
+            <span className="truncate">{s.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -187,34 +217,40 @@ function MessageBubble({
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[90%] space-y-2">
-        <div className="rounded-2xl rounded-bl-md bg-neutral-100 px-3 py-2 text-sm text-neutral-900">
+      <div className="max-w-[95%] space-y-2">
+        <div className="text-sm leading-relaxed text-neutral-900">
           {message.pending ? (
-            <span className="inline-flex gap-1">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400" />
+            <span className="inline-flex items-center gap-1">
+              <Dot delay={0} />
+              <Dot delay={150} />
+              <Dot delay={300} />
             </span>
           ) : (
-            renderWithCitations(message.content, message.citations ?? [], onCitationClick)
+            renderWithCitations(
+              message.content,
+              message.citations ?? [],
+              onCitationClick,
+            )
           )}
         </div>
-        {!message.pending && message.citations && message.citations.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {message.citations.map((c) => (
-              <button
-                key={c._id}
-                type="button"
-                onClick={() => onCitationClick?.(c._id)}
-                className="max-w-full truncate rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700 transition-colors hover:border-neutral-400 hover:bg-neutral-50"
-                title={`${c.from} — ${c.subject}`}
-              >
-                <span className="font-medium">{extractName(c.from)}:</span>{" "}
-                {c.subject}
-              </button>
-            ))}
-          </div>
-        )}
+        {!message.pending &&
+          message.citations &&
+          message.citations.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {message.citations.map((c) => (
+                <button
+                  key={c._id}
+                  type="button"
+                  onClick={() => onCitationClick?.(c._id)}
+                  className="max-w-full truncate rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700 transition-colors hover:border-neutral-400 hover:bg-neutral-50"
+                  title={`${c.from} — ${c.subject}`}
+                >
+                  <span className="font-medium">{extractName(c.from)}:</span>{" "}
+                  {c.subject}
+                </button>
+              ))}
+            </div>
+          )}
       </div>
     </div>
   );
@@ -225,9 +261,6 @@ function renderWithCitations(
   citations: Array<{ _id: Id<"emails"> }>,
   onCitationClick?: (emailId: Id<"emails">) => void,
 ): React.ReactNode {
-  // Replace [emailId] inline citations with superscript numbers tied to the
-  // chip list below. Keeps the prose readable but lets users jump to a
-  // specific cite.
   const indexById = new Map<string, number>();
   citations.forEach((c, i) => indexById.set(c._id, i + 1));
   const parts: React.ReactNode[] = [];
@@ -238,7 +271,7 @@ function renderWithCitations(
   while ((m = re.exec(content)) !== null) {
     const id = m[1];
     const n = indexById.get(id);
-    if (n === undefined) continue; // unknown citation — leave in place
+    if (n === undefined) continue;
     parts.push(content.slice(last, m.index));
     parts.push(
       <button
@@ -260,4 +293,144 @@ function renderWithCitations(
 function extractName(from: string): string {
   const match = from.match(/^"?([^"<]+?)"?\s*<.+>$/);
   return match?.[1]?.trim() ?? from;
+}
+
+function Dot({ delay }: { delay: number }) {
+  return (
+    <span
+      className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400"
+      style={{ animationDelay: `${delay}ms` }}
+    />
+  );
+}
+
+function ChevronDown() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function ArrowUp() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5 animate-spin"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+    >
+      <circle cx="12" cy="12" r="9" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 1-9 9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </svg>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
+      <path d="M19 17l.7 2 2 .7-2 .7L19 23l-.7-2-2-.7 2-.7z" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
 }

@@ -40,6 +40,22 @@ export const seedDefaultBuckets = internalMutation({
   },
 });
 
+export const currentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+    };
+  },
+});
+
 export const listBuckets = query({
   args: {},
   handler: async (ctx) => {
