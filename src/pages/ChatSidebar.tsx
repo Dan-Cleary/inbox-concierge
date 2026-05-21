@@ -11,6 +11,7 @@ import { useConfirm } from "../components/ConfirmDialog";
 // "Listing labels…" while the agent runs them.
 const TOOL_LABELS: Record<string, string> = {
   searchInbox: "Searching inbox",
+  listEmails: "Listing emails",
   listLabels: "Reading your labels",
   createLabel: "Creating a label",
   deleteLabel: "Deleting a label",

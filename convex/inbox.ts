@@ -390,6 +390,79 @@ export const deleteBucketForUser = internalMutation({
   },
 });
 
+// Agent tool support: hydrate emails by id (for searchInbox), including
+// each email's canonical bucket name so the LLM doesn't have to infer it.
+export const getEmailsByIdWithLabel = internalQuery({
+  args: { emailIds: v.array(v.id("emails")) },
+  handler: async (ctx, { emailIds }) => {
+    const out: Array<{
+      _id: Id<"emails">;
+      subject: string;
+      from: string;
+      snippet: string;
+      date: number;
+      label: string | null;
+    }> = [];
+    for (const id of emailIds) {
+      const e = await ctx.db.get(id);
+      if (!e) continue;
+      const bucket = e.bucketId ? await ctx.db.get(e.bucketId) : null;
+      out.push({
+        _id: e._id,
+        subject: e.subject,
+        from: e.from,
+        snippet: e.snippet,
+        date: e.date,
+        label: bucket?.name ?? null,
+      });
+    }
+    return out;
+  },
+});
+
+// Agent tool support: list recent emails for a user, optionally filtered
+// by label name. Sorted by date desc.
+export const listEmailsForAgent = internalQuery({
+  args: {
+    userId: v.id("users"),
+    labelName: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const emails = await ctx.db
+      .query("emails")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const buckets = await ctx.db
+      .query("buckets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const bucketByName = new Map(
+      buckets.map((b) => [b.name.toLowerCase(), b]),
+    );
+    const bucketById = new Map(buckets.map((b) => [b._id, b]));
+
+    let filtered = emails;
+    if (args.labelName) {
+      const match = bucketByName.get(args.labelName.toLowerCase());
+      if (!match) return [];
+      filtered = emails.filter((e) => e.bucketId === match._id);
+    }
+    filtered.sort((a, b) => b.date - a.date);
+    const limit = args.limit ?? 10;
+    return filtered.slice(0, limit).map((e) => ({
+      cid: e._id,
+      from: e.from,
+      subject: e.subject,
+      snippet: e.snippet,
+      date: e.date,
+      label: e.bucketId
+        ? (bucketById.get(e.bucketId)?.name ?? null)
+        : null,
+    }));
+  },
+});
+
 export const labelsWithCountsFor = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
