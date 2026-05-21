@@ -21,6 +21,7 @@ import type * as evalsDb from "../evalsDb.js";
 import type * as gmail from "../gmail.js";
 import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
+import type * as labelChanges from "../labelChanges.js";
 import type * as models from "../models.js";
 import type * as promptVersions from "../promptVersions.js";
 import type * as prompts from "../prompts.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   gmail: typeof gmail;
   http: typeof http;
   inbox: typeof inbox;
+  labelChanges: typeof labelChanges;
   models: typeof models;
   promptVersions: typeof promptVersions;
   prompts: typeof prompts;

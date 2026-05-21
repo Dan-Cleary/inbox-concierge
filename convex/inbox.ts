@@ -11,6 +11,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
 import { DEFAULT_BUCKETS } from "./prompts";
 import { getValidAccessToken } from "./gmail";
+import { scheduleDebouncedReclassify } from "./labelChanges";
 
 // Cap user-defined labels at MAX_LABELS to keep the LLM's bucket list short
 // (longer taxonomies degrade classification accuracy) and the UI scannable.
@@ -95,6 +96,7 @@ export const createBucket = mutation({
       isDefault: false,
       sortOrder,
     });
+    await scheduleDebouncedReclassify(ctx, userId);
     return bucketId;
   },
 });
@@ -124,7 +126,8 @@ export const deleteBucket = mutation({
     if (bucket.isDefault) {
       throw new Error("Cannot delete a default bucket");
     }
-    // Unassign any emails that were in this bucket so they get re-classified.
+    // Unassign any emails that were in this bucket. The debounced
+    // reclassify below will re-sort them (along with everything else).
     const emails = await ctx.db
       .query("emails")
       .withIndex("by_user_bucket", (q) =>
@@ -132,12 +135,10 @@ export const deleteBucket = mutation({
       )
       .collect();
     for (const e of emails) {
-      await ctx.db.patch(e._id, {
-        bucketId: undefined,
-        classifyStatus: "queued",
-      });
+      await ctx.db.patch(e._id, { bucketId: undefined });
     }
     await ctx.db.delete(bucketId);
+    await scheduleDebouncedReclassify(ctx, userId);
   },
 });
 

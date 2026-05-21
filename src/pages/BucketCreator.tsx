@@ -57,9 +57,6 @@ export default function BucketCreator() {
 
 function CreateLabelModal({ onClose }: { onClose: () => void }) {
   const createBucket = useMutation(api.inbox.createBucket);
-  const startReclassification = useMutation(
-    api.workflows.startReclassification,
-  );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -80,7 +77,8 @@ function CreateLabelModal({ onClose }: { onClose: () => void }) {
               name: name.trim(),
               description: description.trim(),
             });
-            await startReclassification({});
+            // Reclassify is scheduled server-side (debounced) — UI doesn't
+            // need to trigger it.
             onClose();
           } catch (err) {
             setError(err instanceof Error ? err.message : String(err));

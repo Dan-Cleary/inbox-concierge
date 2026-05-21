@@ -167,6 +167,13 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // Tracks the latest scheduled reclassify per user so subsequent label
+  // changes can cancel + reschedule (debouncing across rapid mutations).
+  reclassifyJobs: defineTable({
+    userId: v.id("users"),
+    scheduledFnId: v.id("_scheduled_functions"),
+  }).index("by_user", ["userId"]),
+
   // Per-user settings (e.g. which model wins after eval).
   userSettings: defineTable({
     userId: v.id("users"),

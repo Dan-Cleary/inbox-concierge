@@ -7,6 +7,7 @@ import {
 } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
+import { scheduleDebouncedReclassify } from "./labelChanges";
 
 // Snapshot of the classified inbox shaped for the discovery agent's prompt.
 // Returns only classified rows (so the agent isn't reasoning over in-flight
@@ -148,6 +149,7 @@ export const acceptSuggestion = mutation({
       status: "accepted",
       acceptedBucketId: bucketId,
     });
+    await scheduleDebouncedReclassify(ctx, userId);
     return bucketId;
   },
 });

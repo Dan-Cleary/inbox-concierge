@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { internalMutation, mutation } from "./_generated/server";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -91,6 +91,38 @@ export const startClassification = mutation({
       },
     );
     return { workflowId, count: emailIds.length };
+  },
+});
+
+// Internal: runs as the scheduled function for debounced reclassifies.
+// Re-classifies every email for the given user against the current bucket
+// set. Idempotent re: stale queued emails (it marks them re-classifying
+// alongside everything else, so a stuck queue gets unstuck).
+export const runReclassifyForUser = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    // Clean up the job-tracker row first so a brand-new change that lands
+    // while we're starting the workflow gets its own future schedule.
+    const job = await ctx.db
+      .query("reclassifyJobs")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+    if (job) await ctx.db.delete(job._id);
+
+    const emails = await ctx.db
+      .query("emails")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    if (emails.length === 0) return;
+    const emailIds = emails.map((e) => e._id);
+    for (const id of emailIds) {
+      await ctx.db.patch(id, { classifyStatus: "re-classifying" });
+    }
+    await workflow.start(ctx, internal.workflows.classifyInboxWorkflow, {
+      userId: args.userId,
+      emailIds,
+      modelId: DEFAULT_MODEL,
+    });
   },
 });
 
