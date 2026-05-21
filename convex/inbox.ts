@@ -376,10 +376,24 @@ export const markClassificationFailed = internalMutation({
   },
   handler: async (ctx, { emailIds, error }) => {
     for (const id of emailIds) {
-      await ctx.db.patch(id, {
-        classifyStatus: "failed",
-        classifyError: error,
-      });
+      const email = await ctx.db.get(id);
+      if (!email) continue;
+      // If we already have a good classification, keep it. A failed
+      // re-classify is almost always transient (rate limit, network blip)
+      // and the prior bucket assignment is still useful. We just record
+      // the error and reset status to "classified" so the UI doesn't
+      // light up red on every transient hiccup.
+      if (email.bucketId) {
+        await ctx.db.patch(id, {
+          classifyStatus: "classified",
+          classifyError: error,
+        });
+      } else {
+        await ctx.db.patch(id, {
+          classifyStatus: "failed",
+          classifyError: error,
+        });
+      }
     }
   },
 });
