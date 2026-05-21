@@ -79,13 +79,11 @@ function SuggestionRow({
           onClick={() => setOpen((v) => !v)}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           aria-expanded={open}
+          title={s.rationale}
         >
           <Chevron open={open} />
           <span className="truncate text-sm font-medium text-neutral-900">
             {s.name}
-          </span>
-          <span className="hidden truncate text-xs text-neutral-500 sm:inline">
-            — {s.rationale}
           </span>
         </button>
         <button

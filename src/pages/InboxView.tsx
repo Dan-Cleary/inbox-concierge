@@ -3,7 +3,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
-import BucketCreator from "./BucketCreator";
+import { CreateLabelButton } from "./BucketCreator";
 import BucketSuggestions from "./BucketSuggestions";
 import ChatSidebar from "./ChatSidebar";
 
@@ -53,12 +53,10 @@ export default function InboxView() {
   const syncInbox = useAction(api.inbox.syncInbox);
   const startClassification = useMutation(api.workflows.startClassification);
   const deleteBucket = useMutation(api.inbox.deleteBucket);
-  const triggerDiscovery = useAction(api.agents.triggerDiscovery);
   const { signOut } = useAuthActions();
 
   const [selected, setSelected] = useState<Selection>("all");
   const [syncing, setSyncing] = useState(false);
-  const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -106,18 +104,6 @@ export default function InboxView() {
     }
   };
 
-  const handleDiscover = async () => {
-    setDiscovering(true);
-    setError(null);
-    try {
-      await triggerDiscovery({});
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDiscovering(false);
-    }
-  };
-
   if (emails.length === 0) {
     return (
       <EmptyInboxState
@@ -151,8 +137,6 @@ export default function InboxView() {
         if (confirm(`Delete label "${b.name}"?`))
           deleteBucket({ bucketId: b._id });
       }}
-      onDiscover={handleDiscover}
-      discovering={discovering}
       onSignOut={() => void signOut()}
       error={error}
     />
@@ -355,8 +339,6 @@ function Sidebar({
   selected,
   onSelect,
   onDeleteBucket,
-  onDiscover,
-  discovering,
   onSignOut,
   error,
 }: {
@@ -375,8 +357,6 @@ function Sidebar({
   selected: Selection;
   onSelect: (s: Selection) => void;
   onDeleteBucket: (b: Bucket) => void;
-  onDiscover: () => void;
-  discovering: boolean;
   onSignOut: () => void;
   error: string | null;
 }) {
@@ -386,11 +366,14 @@ function Sidebar({
       <StatsBar stats={stats} />
 
       <div>
-        <div className="mb-1.5 flex items-baseline justify-between px-1">
+        <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
           <h3 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
             Labels
           </h3>
-          <LabelCapacityBadge />
+          <div className="flex items-center gap-1.5">
+            <LabelCapacityBadge />
+            <CreateLabelButton />
+          </div>
         </div>
       <nav className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
         <BucketRow
@@ -423,22 +406,6 @@ function Sidebar({
         ))}
       </nav>
       </div>
-
-      <BucketCreator />
-
-      <button
-        type="button"
-        onClick={onDiscover}
-        disabled={discovering || stats.classified < 30}
-        title={
-          stats.classified < 30
-            ? "Need at least 30 sorted emails before suggesting"
-            : undefined
-        }
-        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-50"
-      >
-        {discovering ? "Looking…" : "✨ Suggest labels"}
-      </button>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
