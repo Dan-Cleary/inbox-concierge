@@ -22,12 +22,11 @@ export default function App() {
           <div className="mx-auto inline-block">
             <AtriumMark size={44} />
           </div>
-          <p className="kicker mt-5 text-[var(--moss)]">Inbox concierge</p>
-          <h1 className="mt-2 text-[28px] font-medium leading-tight tracking-tight">
-            The room is locked.
+          <h1 className="mt-5 text-[26px] font-medium leading-tight tracking-tight">
+            Inbox Concierge
           </h1>
           <p className="mt-2 text-[13px] text-[var(--mute)]">
-            Sign in with Google. We'll sort your last 200 threads into rooms.
+            Sign in with Google. We sort your last 200 threads into labels.
           </p>
           <button
             type="button"

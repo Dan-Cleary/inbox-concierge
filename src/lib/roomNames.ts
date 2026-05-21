@@ -1,30 +1,14 @@
-// Garden voice: buckets are "rooms" with botanical/spatial names. The
-// classifier still uses the internal canonical names (Important / Can wait
-// / etc.) — this is a display-only mapping so renaming doesn't invalidate
-// the prompt history or eval dataset.
+// Label color palette. Canonical names from the classifier are kept as-is
+// in the UI — no display-name mapping. Only colors are mapped, so the
+// sidebar dots, inline pills, and chart legends share one source of truth.
 
-export const ROOM_DISPLAY: Record<
-  string,
-  { name: string; note: string; color: string }
-> = {
-  Important: { name: "For you", note: "Reply today.", color: "#A33A2E" },
-  "Can wait": { name: "Pending", note: "Sit with these.", color: "#7A6B43" },
-  "Auto-archive": {
-    name: "Filed",
-    note: "I'll archive at 2.",
-    color: "#6E7068",
-  },
-  Newsletter: {
-    name: "Reading",
-    note: "For your coffee.",
-    color: "#3D5B6E",
-  },
-  "Production alerts": {
-    name: "Systems",
-    note: "One still warm.",
-    color: "#A33A2E",
-  },
-  Outreach: { name: "People", note: "Strangers and friends.", color: "#5B6E47" },
+const LABEL_COLOR: Record<string, string> = {
+  Important: "#A33A2E",
+  "Can wait": "#7A6B43",
+  "Auto-archive": "#6E7068",
+  Newsletter: "#3D5B6E",
+  "Production alerts": "#A33A2E",
+  Outreach: "#5B6E47",
 };
 
 const CUSTOM_PALETTE = [
@@ -36,20 +20,18 @@ const CUSTOM_PALETTE = [
   "#5C4E7A",
 ];
 
-export function roomNameFor(canonical: string): string {
-  return ROOM_DISPLAY[canonical]?.name ?? canonical;
-}
-
-export function roomColorFor(
+export function labelColorFor(
   canonical: string,
   customIndex: number = 0,
 ): string {
   return (
-    ROOM_DISPLAY[canonical]?.color ??
+    LABEL_COLOR[canonical] ??
     CUSTOM_PALETTE[customIndex % CUSTOM_PALETTE.length]
   );
 }
 
-export function roomNoteFor(canonical: string): string {
-  return ROOM_DISPLAY[canonical]?.note ?? "A custom room.";
+// Back-compat exports so I don't have to chase every import.
+export const roomColorFor = labelColorFor;
+export function roomNameFor(canonical: string): string {
+  return canonical;
 }

@@ -65,7 +65,7 @@ export default function ChatSidebar({
       />
       <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-[var(--ink)] bg-[var(--bg)]">
         <header className="flex items-center justify-between gap-2 border-b border-[var(--rule)] px-4 py-3">
-          <p className="kicker text-[var(--moss)]">The room</p>
+          <p className="kicker text-[var(--moss)]">Your inbox</p>
           <div className="flex items-center gap-1">
             {!empty && (
               <button
@@ -135,7 +135,7 @@ export default function ChatSidebar({
                   void submit();
                 }
               }}
-              placeholder="Ask the room"
+              placeholder="Ask your inbox"
               rows={1}
               disabled={submitting}
               className="block w-full resize-none border-0 bg-transparent px-3 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--mute-dim)] focus:outline-none"

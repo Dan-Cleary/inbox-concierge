@@ -15,7 +15,7 @@ export default function BucketSuggestions() {
     <div className="mb-3 border border-[var(--rule)] bg-[var(--card)] px-3 py-2.5">
       <p className="kicker mb-2 flex items-center gap-1.5 text-[var(--moss)]">
         <SparkleIcon />
-        Suggested rooms
+        Suggested labels
       </p>
       <ul className="space-y-1">
         {suggestions.map((s) => (
