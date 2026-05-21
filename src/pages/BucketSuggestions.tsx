@@ -1,7 +1,12 @@
 import { useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+
+// How long to wait after the last accept before kicking off the
+// reclassification. Lets the user accept multiple suggestions in a row
+// and batches them into one workflow instead of N back-to-back.
+const RECLASSIFY_DEBOUNCE_MS = 1500;
 
 export default function BucketSuggestions() {
   const suggestions = useQuery(api.agentsDb.listPendingSuggestions);
@@ -11,6 +16,24 @@ export default function BucketSuggestions() {
     api.workflows.startReclassification,
   );
   const [busy, setBusy] = useState<Id<"bucketSuggestions"> | null>(null);
+
+  // Debounce reclassify across rapid accepts. The timer holds while the user
+  // is still picking; when it expires we fire one reclassify covering every
+  // newly-created bucket.
+  const reclassifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueReclassify = () => {
+    if (reclassifyTimer.current) clearTimeout(reclassifyTimer.current);
+    reclassifyTimer.current = setTimeout(() => {
+      reclassifyTimer.current = null;
+      void startReclassification({});
+    }, RECLASSIFY_DEBOUNCE_MS);
+  };
+  useEffect(
+    () => () => {
+      if (reclassifyTimer.current) clearTimeout(reclassifyTimer.current);
+    },
+    [],
+  );
 
   if (!suggestions || suggestions.length === 0) return null;
 
@@ -32,7 +55,9 @@ export default function BucketSuggestions() {
               setBusy(s._id);
               try {
                 await accept({ suggestionId: s._id });
-                await startReclassification({});
+                // Debounce — wait briefly in case the user accepts more
+                // suggestions, then fire one combined reclassify.
+                queueReclassify();
               } finally {
                 setBusy(null);
               }
