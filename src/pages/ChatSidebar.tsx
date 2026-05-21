@@ -63,33 +63,36 @@ export default function ChatSidebar({
         className="fixed inset-0 z-40 bg-black/20 lg:hidden"
         onClick={onClose}
       />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-neutral-200 bg-white shadow-2xl">
-        <header className="flex items-center justify-end gap-1 px-3 py-3 text-neutral-400">
-          {!empty && (
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-[var(--ink)] bg-[var(--bg)]">
+        <header className="flex items-center justify-between gap-2 border-b border-[var(--rule)] px-4 py-3">
+          <p className="kicker text-[var(--moss)]">The room</p>
+          <div className="flex items-center gap-1">
+            {!empty && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: "Clear chat history?",
+                    confirmLabel: "Clear",
+                    variant: "danger",
+                  });
+                  if (ok) clearChat();
+                }}
+                className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--mute)] hover:text-[var(--ink)]"
+                aria-label="Clear chat"
+              >
+                Clear
+              </button>
+            )}
             <button
               type="button"
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Clear chat history?",
-                  confirmLabel: "Clear",
-                  variant: "danger",
-                });
-                if (ok) clearChat();
-              }}
-              className="rounded px-2 py-1 text-xs font-medium hover:bg-neutral-100 hover:text-neutral-700"
-              aria-label="Clear chat"
+              onClick={onClose}
+              className="p-1.5 text-[var(--mute)] hover:text-[var(--ink)]"
+              aria-label="Close chat"
             >
-              Clear
+              <CloseIcon />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1.5 hover:bg-neutral-100 hover:text-neutral-700"
-            aria-label="Close chat"
-          >
-            <CloseIcon />
-          </button>
+          </div>
         </header>
 
         <div
@@ -117,9 +120,11 @@ export default function ChatSidebar({
           )}
         </div>
 
-        <div className="px-4 pb-4 pt-2">
-          {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
-          <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm transition-colors focus-within:border-neutral-400">
+        <div className="border-t border-[var(--rule)] px-4 py-3">
+          {error && (
+            <p className="mb-2 text-[11px] text-[var(--alert)]">{error}</p>
+          )}
+          <div className="border border-[var(--ink)] bg-[var(--card-hi)] focus-within:border-[var(--moss)]">
             <textarea
               ref={inputRef}
               value={input}
@@ -130,17 +135,17 @@ export default function ChatSidebar({
                   void submit();
                 }
               }}
-              placeholder="Ask a question"
+              placeholder="Ask the room"
               rows={1}
               disabled={submitting}
-              className="block w-full resize-none rounded-2xl border-0 bg-transparent px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
+              className="block w-full resize-none border-0 bg-transparent px-3 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--mute-dim)] focus:outline-none"
             />
-            <div className="flex items-center justify-end gap-1 px-2 pb-2">
+            <div className="flex items-center justify-end gap-1 border-t border-[var(--rule-soft)] px-2 py-1.5">
               <button
                 type="button"
                 onClick={() => void submit()}
                 disabled={!input.trim() || submitting}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white transition-opacity hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400"
+                className="inline-flex h-7 w-7 items-center justify-center bg-[var(--ink)] text-[var(--bg)] transition-opacity hover:bg-[var(--ink-soft)] disabled:bg-[var(--rule)] disabled:text-[var(--mute-dim)]"
                 aria-label="Send"
               >
                 {submitting ? <Spinner /> : <ArrowUp />}
@@ -170,18 +175,18 @@ function EmptyState({
 }) {
   return (
     <div className="pt-6">
-      <h2 className="text-xl font-semibold tracking-tight text-neutral-900">
+      <h2 className="text-[22px] font-medium leading-tight tracking-tight text-[var(--ink)]">
         Hi {firstName}, how can I help?
       </h2>
-      <div className="mt-5 space-y-2">
+      <div className="mt-5 space-y-1.5">
         {SUGGESTIONS.map((s) => (
           <button
             key={s.label}
             type="button"
             onClick={() => onPick(s.label)}
-            className="flex w-full items-center gap-3 rounded-full bg-neutral-50 px-4 py-3 text-left text-sm text-neutral-800 transition-colors hover:bg-neutral-100"
+            className="flex w-full items-center gap-3 border border-[var(--rule)] bg-[var(--card)] px-3 py-2.5 text-left text-[13px] text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--card-hi)]"
           >
-            <span className="shrink-0 text-neutral-500">{s.icon}</span>
+            <span className="shrink-0 text-[var(--mute)]">{s.icon}</span>
             <span className="truncate">{s.label}</span>
           </button>
         ))}
@@ -283,7 +288,7 @@ function renderWithCitations(
         key={key++}
         type="button"
         onClick={() => onCitationClick?.(id as Id<"emails">)}
-        className="mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded bg-neutral-900 px-1 text-[10px] font-bold text-white hover:bg-neutral-700"
+        className="mx-0.5 inline-flex h-4 min-w-4 items-center justify-center bg-[var(--moss)] px-1 text-[10px] font-bold text-white hover:bg-[var(--ink)]"
         title="Jump to email"
       >
         {n}
@@ -303,7 +308,7 @@ function extractName(from: string): string {
 function Dot({ delay }: { delay: number }) {
   return (
     <span
-      className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400"
+      className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--mute)]"
       style={{ animationDelay: `${delay}ms` }}
     />
   );
