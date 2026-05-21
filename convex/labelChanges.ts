@@ -1,4 +1,5 @@
-import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -52,6 +53,25 @@ export const pendingChanges = query({
       .query("pendingLabelChanges")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
+  },
+});
+
+// Same logic as applyPendingChanges but takes explicit userId, for use
+// from agent tools that don't have an auth ctx.
+export const applyPendingChangesForUser = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args): Promise<{ applied: number }> => {
+    const pending = await ctx.db
+      .query("pendingLabelChanges")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+    if (pending) await ctx.db.delete(pending._id);
+    await ctx.scheduler.runAfter(
+      0,
+      internal.workflows.runReclassifyForUser,
+      { userId: args.userId },
+    );
+    return { applied: pending?.changeCount ?? 0 };
   },
 });
 

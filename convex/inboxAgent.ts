@@ -134,23 +134,24 @@ const deleteLabel = createTool({
   },
 });
 
-// Tool: runReclassify. Re-sorts every email against the current label
-// set. Use when the user explicitly asks ('re-sort my inbox', 'run the
-// classifier again') OR after creating a label if the user wants the
-// inbox sorted immediately rather than via the Apply banner.
+// Tool: runReclassify. Apply any pending label changes and re-sort
+// every email against the current label set. Clears the pending banner
+// (same path as the UI Apply button) so the user doesn't have to click
+// it themselves after asking the agent to do this.
 const runReclassify = createTool({
   description:
-    "Re-sort the user's entire inbox against the current label set. Use only when the user explicitly asks. Takes ~40 seconds; tell the user it's running in the background and will update live.",
+    "Apply pending label changes and re-sort the user's entire inbox against the current label set. This is the same as the user clicking 'Apply & re-sort' in the inbox banner. Use when the user asks to apply changes, re-sort, re-classify, or 'apply now'. Takes ~40 seconds; tell the user it's running in the background and the inbox will update live.",
   inputSchema: z.object({}),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   execute: async (ctx: any) => {
     const userId = ctx.userId as Id<"users"> | undefined;
     if (!userId) return { ok: false, error: "Not signed in" };
     try {
-      await ctx.runMutation(internal.workflows.runReclassifyForUser, {
-        userId,
-      });
-      return { ok: true };
+      const result = (await ctx.runMutation(
+        internal.labelChanges.applyPendingChangesForUser,
+        { userId },
+      )) as { applied: number };
+      return { ok: true, appliedChanges: result.applied };
     } catch (err) {
       return {
         ok: false,
@@ -173,7 +174,7 @@ Rules:
 - For broad "summarize my inbox" questions, call listLabels first to see the label landscape, then searchInbox per label as needed.
 - When the user EXPLICITLY asks you to create a label ("create a label for X", "sort all my finance emails together"), call createLabel with a short name and a clear criterion description. After creating, tell the user what was added and that they can hit Apply in the inbox banner to re-sort right away — or ask if they want you to run it for them.
 - When the user EXPLICITLY asks to delete a label ("remove the X label", "delete the investors label"), call deleteLabel. Default labels (Important, Can wait, Auto-archive, Newsletter) are protected — if the user asks to delete one, decline politely and explain they're part of the core taxonomy.
-- When the user EXPLICITLY asks to re-sort the inbox ("re-classify", "re-sort", "run the classifier again", "apply now"), call runReclassify and tell them it's running.
+- When the user EXPLICITLY asks to re-sort the inbox or apply changes ("re-classify", "re-sort", "run the classifier again", "apply now", "apply my changes"), call runReclassify and tell them it's running. This also clears any pending label changes — no need for the user to click the Apply banner separately.
 - Do not narrate ("Let me search..."). Just call the tool, then give the answer.
 - When a fact comes from a searchInbox snippet, append its citation handle: [cid:<handle>]. You may stack multiple: [cid:a][cid:b].
 - If a search returns nothing relevant, say so plainly. Do not invent senders, subjects, or content.
