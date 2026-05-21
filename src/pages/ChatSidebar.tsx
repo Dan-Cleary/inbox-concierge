@@ -61,31 +61,28 @@ export default function ChatSidebar({
         className="fixed inset-0 z-40 bg-black/20 lg:hidden"
         onClick={onClose}
       />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-neutral-200 bg-white shadow-2xl">
-        <header className="flex items-center justify-between px-4 py-3">
-          <button
-            type="button"
-            onClick={() => {
-              if (empty) return;
-              if (confirm("Start a new chat? This clears your history.")) {
-                clearChat();
-              }
-            }}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-neutral-800 hover:bg-neutral-100"
-          >
-            New chat
-            <ChevronDown />
-          </button>
-          <div className="flex items-center gap-1 text-neutral-400">
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-neutral-200 bg-white shadow-2xl">
+        <header className="flex items-center justify-end gap-1 px-3 py-3 text-neutral-400">
+          {!empty && (
             <button
               type="button"
-              onClick={onClose}
-              className="rounded p-1.5 hover:bg-neutral-100 hover:text-neutral-700"
-              aria-label="Close chat"
+              onClick={() => {
+                if (confirm("Clear chat history?")) clearChat();
+              }}
+              className="rounded px-2 py-1 text-xs font-medium hover:bg-neutral-100 hover:text-neutral-700"
+              aria-label="Clear chat"
             >
-              <CloseIcon />
+              Clear
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1.5 hover:bg-neutral-100 hover:text-neutral-700"
+            aria-label="Close chat"
+          >
+            <CloseIcon />
+          </button>
         </header>
 
         <div
@@ -301,22 +298,6 @@ function Dot({ delay }: { delay: number }) {
       className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400"
       style={{ animationDelay: `${delay}ms` }}
     />
-  );
-}
-
-function ChevronDown() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-3.5 w-3.5"
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
   );
 }
 
