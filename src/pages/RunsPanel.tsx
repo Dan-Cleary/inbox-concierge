@@ -94,7 +94,7 @@ export default function RunsPanel({
 
   return (
     <section className="space-y-4">
-      <div className="rounded-md border border-neutral-200 bg-white p-4">
+      <div className="border border-[var(--rule)] bg-[var(--card)] p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-neutral-600">Models:</span>
           {models.map((m) => {
@@ -102,10 +102,10 @@ export default function RunsPanel({
             return (
               <label
                 key={m.id}
-                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`flex cursor-pointer items-center gap-1.5 border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   checked
-                    ? "border-neutral-900 bg-neutral-900 text-white"
-                    : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400"
+                    ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--bg)]"
+                    : "border-[var(--rule)] bg-[var(--bg)] text-[var(--ink)] hover:border-[var(--ink)]"
                 }`}
                 title={`${m.label} · $${m.inputUsdPerM}/$${m.outputUsdPerM} per 1M tokens`}
               >
@@ -150,7 +150,7 @@ export default function RunsPanel({
                   (e.target.value || null) as Id<"promptVersions"> | null,
                 )
               }
-              className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs sm:flex-none"
+              className="min-w-0 flex-1 border border-[var(--rule)] bg-[var(--bg)] px-2 py-1 text-[12px] sm:flex-none"
             >
               {(promptVersions ?? []).length === 0 && (
                 <option value="">latest (will seed on first run)</option>
@@ -165,7 +165,7 @@ export default function RunsPanel({
             <button
               type="button"
               onClick={() => setPromptEditorOpen(true)}
-              className="shrink-0 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+              className="shrink-0 border border-[var(--ink)] bg-[var(--bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink)] hover:bg-[var(--card)]"
             >
               Edit
             </button>
@@ -188,7 +188,7 @@ export default function RunsPanel({
                 setRunning(false);
               }
             }}
-            className="w-full shrink-0 rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 sm:ml-auto sm:w-auto"
+            className="w-full shrink-0 border border-[var(--ink)] bg-[var(--ink)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bg)] hover:bg-[var(--ink-soft)] disabled:opacity-50 sm:ml-auto sm:w-auto"
           >
             {running ? "Running…" : "Run bench"}
           </button>
@@ -196,7 +196,7 @@ export default function RunsPanel({
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-neutral-200 bg-white">
+      <div className="overflow-x-auto border border-[var(--rule)] bg-[var(--bg)]">
         <table className="w-full min-w-[820px] text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
@@ -256,7 +256,7 @@ export default function RunsPanel({
                   key={r._id}
                   className={
                     isExpanded
-                      ? "bg-blue-50/60 ring-1 ring-inset ring-blue-300"
+                      ? "bg-[var(--card-hi)] ring-1 ring-inset ring-[var(--moss)]"
                       : ""
                   }
                 >
@@ -326,14 +326,16 @@ export default function RunsPanel({
 function StatusPill({ status }: { status: string }) {
   const cls =
     status === "completed"
-      ? "bg-green-100 text-green-700"
+      ? "bg-[var(--card)] text-[var(--moss)] border-[var(--moss)]"
       : status === "running"
-        ? "bg-blue-100 text-blue-700"
+        ? "bg-[var(--card)] text-[var(--ink)] border-[var(--ink)]"
         : status === "failed"
-          ? "bg-red-100 text-red-700"
-          : "bg-neutral-100 text-neutral-600";
+          ? "bg-[var(--card)] text-[var(--alert)] border-[var(--alert)]"
+          : "bg-[var(--card)] text-[var(--mute)] border-[var(--rule)]";
   return (
-    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${cls}`}>
+    <span
+      className={`border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${cls}`}
+    >
       {status}
     </span>
   );
