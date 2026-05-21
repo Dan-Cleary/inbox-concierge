@@ -23,10 +23,11 @@ export default function App() {
             <AtriumMark size={44} />
           </div>
           <h1 className="mt-5 text-[26px] font-medium leading-tight tracking-tight">
-            Inbox Concierge
+            Inbox, sorted.
           </h1>
           <p className="mt-2 text-[13px] text-[var(--mute)]">
-            Sign in with Google. We sort your last 200 threads into labels.
+            We auto-label your last 200 emails and give you an AI agent that
+            can search, sort, and manage your inbox for you.
           </p>
           <button
             type="button"

@@ -306,6 +306,46 @@ export const getEmailsByIdPreservingOrder = internalQuery({
   },
 });
 
+// Agent-facing version of createBucket. The Agent tool runs inside
+// streamText() where there's no auth context to derive userId from, so
+// we take it explicitly. Same validation as the user-facing mutation.
+export const createBucketForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.string(),
+  },
+  handler: async (ctx, args): Promise<Id<"buckets">> => {
+    const existing = await ctx.db
+      .query("buckets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    if (existing.length >= MAX_LABELS) {
+      throw new Error(
+        `You can have at most ${MAX_LABELS} labels. Delete one to make room.`,
+      );
+    }
+    if (existing.some((b) => b.name.toLowerCase() === args.name.toLowerCase())) {
+      throw new Error(`A label called "${args.name}" already exists.`);
+    }
+    const sortOrder =
+      existing.reduce((max, b) => Math.max(max, b.sortOrder), -1) + 1;
+    const bucketId = await ctx.db.insert("buckets", {
+      userId: args.userId,
+      name: args.name,
+      description: args.description,
+      isDefault: false,
+      sortOrder,
+    });
+    await notePendingLabelChange(
+      ctx,
+      args.userId,
+      `Added "${args.name}" (via agent)`,
+    );
+    return bucketId;
+  },
+});
+
 export const labelsWithCountsFor = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

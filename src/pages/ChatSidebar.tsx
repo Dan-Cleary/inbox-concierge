@@ -12,6 +12,8 @@ import { useConfirm } from "../components/ConfirmDialog";
 const TOOL_LABELS: Record<string, string> = {
   searchInbox: "Searching inbox",
   listLabels: "Reading your labels",
+  createLabel: "Creating a label",
+  runReclassify: "Re-sorting your inbox",
 };
 
 // Chat sidebar backed by the Convex Agent component. We don't run our

@@ -66,6 +66,72 @@ const listLabels = createTool({
   },
 });
 
+// Tool: createLabel. Lets the agent add a new label on the user's
+// behalf. The label gets sorted into via the normal pending-changes
+// flow (Apply button surfaces in the inbox UI to commit + reclassify).
+const createLabel = createTool({
+  description:
+    "Create a new label for the user's inbox. Use only when the user explicitly asks ('create a label for X', 'sort all my finance emails together'). After creating, briefly tell the user what label you added; mention that they'll need to hit Apply in the inbox banner to actually re-sort emails into it.",
+  inputSchema: z.object({
+    name: z
+      .string()
+      .min(1)
+      .max(30)
+      .describe(
+        "Short label name (2-3 words). Examples: 'From investors', 'Recruiters', 'Family'.",
+      ),
+    description: z
+      .string()
+      .min(10)
+      .describe(
+        "Plain-English criterion the classifier will use. Be specific about senders, topics, or workflows.",
+      ),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  execute: async (ctx: any, input: { name: string; description: string }) => {
+    const userId = ctx.userId as Id<"users"> | undefined;
+    if (!userId) return { ok: false, error: "Not signed in" };
+    try {
+      const bucketId = (await ctx.runMutation(
+        internal.inbox.createBucketForUser,
+        { userId, name: input.name, description: input.description },
+      )) as Id<"buckets">;
+      return { ok: true, bucketId, name: input.name };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+});
+
+// Tool: runReclassify. Re-sorts every email against the current label
+// set. Use when the user explicitly asks ('re-sort my inbox', 'run the
+// classifier again') OR after creating a label if the user wants the
+// inbox sorted immediately rather than via the Apply banner.
+const runReclassify = createTool({
+  description:
+    "Re-sort the user's entire inbox against the current label set. Use only when the user explicitly asks. Takes ~40 seconds; tell the user it's running in the background and will update live.",
+  inputSchema: z.object({}),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  execute: async (ctx: any) => {
+    const userId = ctx.userId as Id<"users"> | undefined;
+    if (!userId) return { ok: false, error: "Not signed in" };
+    try {
+      await ctx.runMutation(internal.workflows.runReclassifyForUser, {
+        userId,
+      });
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+});
+
 export const inboxAgent = new Agent(components.agent, {
   name: "Inbox Concierge Agent",
   languageModel: anthropic.chat("claude-haiku-4-5"),
@@ -77,10 +143,12 @@ Rules:
 - For questions about email content ("what did X say?", "anything from Stripe?", "what needs a reply?"), call searchInbox with a focused query.
 - For questions about labels or counts ("what labels do I have?", "how many in Important?"), call listLabels.
 - For broad "summarize my inbox" questions, call listLabels first to see the label landscape, then searchInbox per label as needed.
+- When the user EXPLICITLY asks you to create a label ("create a label for X", "sort all my finance emails together"), call createLabel with a short name and a clear criterion description. After creating, tell the user what was added and that they can hit Apply in the inbox banner to re-sort right away — or ask if they want you to run it for them.
+- When the user EXPLICITLY asks to re-sort the inbox ("re-classify", "re-sort", "run the classifier again", "apply now"), call runReclassify and tell them it's running.
 - Do not narrate ("Let me search..."). Just call the tool, then give the answer.
 - When a fact comes from a searchInbox snippet, append its citation handle: [cid:<handle>]. You may stack multiple: [cid:a][cid:b].
 - If a search returns nothing relevant, say so plainly. Do not invent senders, subjects, or content.
 - Prefer short, direct answers. Bullets when listing emails.`,
-  tools: { listLabels, searchInbox },
+  tools: { listLabels, searchInbox, createLabel, runReclassify },
   stopWhen: stepCountIs(8),
 });
