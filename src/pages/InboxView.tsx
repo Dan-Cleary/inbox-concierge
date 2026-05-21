@@ -57,7 +57,7 @@ export default function InboxView() {
     return <LoadingSkeleton />;
   }
 
-  const handleSync = async () => {
+  const handleSync = useCallback(async () => {
     setSyncing(true);
     setError(null);
     try {
@@ -70,7 +70,19 @@ export default function InboxView() {
     } finally {
       setSyncing(false);
     }
-  };
+  }, [syncInbox, startClassification]);
+
+  // Assignment spec: "On load, group the user's last 200 threads." First
+  // time a user lands with an empty inbox and no error, kick off sync
+  // automatically. The manual Sync button stays as the recovery path
+  // if sync errored out.
+  const shouldAutoSync =
+    emails.length === 0 && !syncing && !error;
+  useEffect(() => {
+    if (!shouldAutoSync) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void handleSync();
+  }, [shouldAutoSync, handleSync]);
 
   if (emails.length === 0) {
     return (
@@ -250,23 +262,47 @@ function EmptyInboxState({
   error: string | null;
   onSignOut: () => void;
 }) {
+  // Auto-sync fires from InboxView on mount, so `syncing` is the steady
+  // state for first-time users; the manual button only shows as a
+  // recovery path after an error.
   return (
     <div className="mx-auto max-w-md pt-8 sm:pt-16">
       <div className="border border-[var(--ink)] bg-[var(--card-hi)] p-8 text-center sm:p-12">
-        <h1 className="text-[24px] font-medium tracking-tight">Sync inbox</h1>
-        <p className="mt-2 text-[13px] text-[var(--mute)]">
-          Pull your last 200 Gmail threads and sort them into labels. ~40s.
-        </p>
-        <button
-          type="button"
-          onClick={onSync}
-          disabled={syncing}
-          className="mt-6 w-full border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bg)] hover:bg-[var(--ink-soft)] disabled:opacity-50"
-        >
-          {syncing ? "Syncing…" : "Sync inbox"}
-        </button>
-        {error && (
-          <p className="mt-3 text-[11px] text-[var(--alert)]">{error}</p>
+        {syncing ? (
+          <>
+            <p className="kicker text-[var(--moss)]">Loading your inbox</p>
+            <h1 className="mt-3 text-[22px] font-medium tracking-tight">
+              Reading your last 200 Gmail threads…
+            </h1>
+            <p className="mt-2 text-[13px] text-[var(--mute)]">
+              About 40 seconds. We'll sort them into labels as they come in.
+            </p>
+            <div className="mt-6 h-1 w-full overflow-hidden bg-[var(--rule-soft)]">
+              <div className="h-full w-1/3 animate-pulse bg-[var(--moss)]" />
+            </div>
+          </>
+        ) : error ? (
+          <>
+            <p className="kicker text-[var(--alert)]">Something broke</p>
+            <h1 className="mt-3 text-[22px] font-medium tracking-tight">
+              We couldn't load your inbox.
+            </h1>
+            <p className="mt-2 text-[12px] text-[var(--alert)]">{error}</p>
+            <button
+              type="button"
+              onClick={onSync}
+              className="mt-6 w-full border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bg)] hover:bg-[var(--ink-soft)]"
+            >
+              Try again
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="kicker text-[var(--moss)]">Starting</p>
+            <h1 className="mt-3 text-[22px] font-medium tracking-tight">
+              Loading your inbox…
+            </h1>
+          </>
         )}
         <button
           type="button"

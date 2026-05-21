@@ -71,6 +71,14 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     // on users. We cast db to any for the table/index lookups; the runtime
     // is fine because these are real Convex tables/indexes from our schema.
     async createOrUpdateUser(ctx, args) {
+      // Reviewer-link path: the credentials provider returns { userId }
+      // pointing at an existing user (REVIEWER_USER_ID). Don't try to
+      // insert/patch — just hand that userId back to Convex Auth.
+      if (args.type === "credentials") {
+        const reviewerUserId = (args.profile as { userId?: Id<"users"> })
+          .userId;
+        if (reviewerUserId) return reviewerUserId;
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = ctx.db as any;
       const {

@@ -12,15 +12,19 @@ export default function App() {
   // Reviewer-link mode: ?reviewer=<secret> auto-signs the visitor in as
   // the designated reviewer user. Strip the param after attempting so
   // the secret doesn't sit in the URL bar (or get bookmarked).
+  // Intentional setState-in-effect: we have to read window.location once
+  // mount completes, and we only run this branch once per page load.
   useEffect(() => {
     if (isLoading || isAuthenticated || reviewerSigningIn) return;
     const url = new URL(window.location.href);
     const secret = url.searchParams.get("reviewer");
     if (!secret) return;
-    setReviewerSigningIn(true);
     url.searchParams.delete("reviewer");
     window.history.replaceState({}, "", url.toString());
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReviewerSigningIn(true);
     void signIn("reviewer", { secret }).catch(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReviewerSigningIn(false);
     });
   }, [isLoading, isAuthenticated, reviewerSigningIn, signIn]);

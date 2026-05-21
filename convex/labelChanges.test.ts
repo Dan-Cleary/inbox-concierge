@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import schema from "./schema";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 // Helper: seed a user + the default buckets so each test starts from a
@@ -17,15 +17,6 @@ async function seedUser(
     await ctx.runMutation(internal.inbox.seedDefaultBuckets, { userId });
     return userId;
   });
-}
-
-// Helper: a TestConvex instance that authenticates as the given user
-// so public mutations/queries can use getAuthUserId.
-function asUser(
-  t: ReturnType<typeof convexTest>,
-  userId: Id<"users">,
-) {
-  return t.withIdentity({ subject: String(userId), issuer: "convex" });
 }
 
 describe("createBucket (public mutation)", () => {
