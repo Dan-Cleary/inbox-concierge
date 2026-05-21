@@ -1,8 +1,4 @@
-import { useEffect, useRef } from "react";
-
-// Custom confirm modal so we never hit the OS-styled `window.confirm`.
-// Headless API: callers pass `open`, `onConfirm`, `onCancel` and the
-// dialog handles backdrop click, Escape key, and focus management.
+import { useEffect, useRef, useState } from "react";
 
 export default function ConfirmDialog({
   open,
@@ -37,14 +33,14 @@ export default function ConfirmDialog({
 
   if (!open) return null;
 
-  const confirmClass =
+  const confirmBgClass =
     variant === "danger"
-      ? "bg-red-600 hover:bg-red-700 focus-visible:ring-red-300"
-      : "bg-neutral-900 hover:bg-neutral-800 focus-visible:ring-neutral-400";
+      ? "bg-[var(--alert)] border-[var(--alert)] hover:opacity-90"
+      : "bg-[var(--ink)] border-[var(--ink)] hover:bg-[var(--ink-soft)]";
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(22,34,26,0.45)] p-4"
       onClick={onCancel}
     >
       <div
@@ -52,24 +48,26 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-lg bg-white shadow-xl"
+        className="w-full max-w-[420px] border border-[var(--ink)] bg-[var(--card-hi)]"
       >
-        <div className="px-5 pt-5 pb-3">
+        <div className="px-7 pt-6 pb-4">
           <h3
             id="confirm-title"
-            className="text-base font-semibold text-neutral-900"
+            className="text-[18px] font-medium tracking-tight text-[var(--ink)]"
           >
             {title}
           </h3>
           {message && (
-            <p className="mt-1.5 text-sm text-neutral-600">{message}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--mute)]">
+              {message}
+            </p>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-neutral-100 px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--rule)] px-7 py-3.5">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+            className="border border-[var(--ink)] bg-[var(--bg)] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink)] hover:bg-[var(--card)]"
           >
             {cancelLabel}
           </button>
@@ -77,7 +75,7 @@ export default function ConfirmDialog({
             ref={confirmBtn}
             type="button"
             onClick={onConfirm}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 ${confirmClass}`}
+            className={`border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bg)] ${confirmBgClass}`}
           >
             {confirmLabel}
           </button>
@@ -86,10 +84,6 @@ export default function ConfirmDialog({
     </div>
   );
 }
-
-// Convenience hook for the common pattern: open + callback.
-// Returns a function `confirm(opts)` that resolves to true/false.
-import { useState } from "react";
 
 export type ConfirmOptions = {
   title: string;

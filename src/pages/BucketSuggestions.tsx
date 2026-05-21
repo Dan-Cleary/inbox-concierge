@@ -12,13 +12,11 @@ export default function BucketSuggestions() {
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
-    <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/40 px-3 py-2 shadow-sm">
-      <div className="mb-1.5 flex items-center gap-1.5">
+    <div className="mb-3 border border-[var(--rule)] bg-[var(--card)] px-3 py-2.5">
+      <p className="kicker mb-2 flex items-center gap-1.5 text-[var(--moss)]">
         <SparkleIcon />
-        <h3 className="text-xs font-semibold text-emerald-900">
-          Suggested labels
-        </h3>
-      </div>
+        Suggested rooms
+      </p>
       <ul className="space-y-1">
         {suggestions.map((s) => (
           <SuggestionRow
@@ -29,7 +27,6 @@ export default function BucketSuggestions() {
               setBusy(s._id);
               try {
                 await accept({ suggestionId: s._id });
-                // Reclassify is scheduled server-side (debounced).
               } finally {
                 setBusy(null);
               }
@@ -69,7 +66,7 @@ function SuggestionRow({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="rounded-md border border-emerald-100 bg-white">
+    <li className="border border-[var(--rule)] bg-[var(--bg)]">
       <div className="flex items-center gap-2 px-2.5 py-1.5">
         <button
           type="button"
@@ -79,7 +76,7 @@ function SuggestionRow({
           title={s.rationale}
         >
           <Chevron open={open} />
-          <span className="truncate text-sm font-medium text-neutral-900">
+          <span className="truncate text-[13px] font-medium text-[var(--ink)]">
             {s.name}
           </span>
         </button>
@@ -87,7 +84,7 @@ function SuggestionRow({
           type="button"
           disabled={busy}
           onClick={onAccept}
-          className="shrink-0 rounded bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="shrink-0 border border-[var(--ink)] bg-[var(--ink)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--bg)] hover:bg-[var(--ink-soft)] disabled:opacity-50"
         >
           {busy ? "…" : "Accept"}
         </button>
@@ -95,19 +92,17 @@ function SuggestionRow({
           type="button"
           disabled={busy}
           onClick={onDismiss}
-          className="shrink-0 rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+          className="shrink-0 border border-[var(--rule)] bg-[var(--bg)] px-2 py-0.5 text-[11px] text-[var(--mute)] hover:border-[var(--ink)] hover:text-[var(--ink)] disabled:opacity-50"
           aria-label="Dismiss suggestion"
         >
           ✕
         </button>
       </div>
       {open && (
-        <div className="border-t border-emerald-100 px-2.5 py-2 text-xs">
-          <p className="text-neutral-600">{s.rationale}</p>
-          <p className="mt-2 text-[10px] uppercase tracking-wide text-neutral-400">
-            Example emails
-          </p>
-          <ul className="mt-1 space-y-0.5 text-neutral-700">
+        <div className="border-t border-[var(--rule)] px-2.5 py-2 text-[12px]">
+          <p className="text-[var(--mute)]">{s.rationale}</p>
+          <p className="kicker mt-2">Examples</p>
+          <ul className="mt-1 space-y-0.5 text-[var(--ink-soft)]">
             {s.samples.slice(0, 3).map((e, i) => (
               <li key={i} className="truncate">
                 · {e.subject}
@@ -129,7 +124,7 @@ function Chevron({ open }: { open: boolean }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`h-3 w-3 shrink-0 text-neutral-400 transition-transform ${
+      className={`h-3 w-3 shrink-0 text-[var(--mute)] transition-transform ${
         open ? "rotate-90" : ""
       }`}
     >
@@ -147,7 +142,7 @@ function SparkleIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-3.5 w-3.5 text-emerald-600"
+      className="h-3 w-3"
     >
       <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
       <path d="M19 17l.7 2 2 .7-2 .7L19 23l-.7-2-2-.7 2-.7z" />
