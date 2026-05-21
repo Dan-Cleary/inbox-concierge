@@ -497,33 +497,24 @@ function EmailList({
           <li
             key={e._id}
             data-email-id={e._id}
-            className={`flex cursor-default items-baseline gap-3 border-b border-[var(--rule-soft)] py-2.5 transition-colors ${
+            className={`grid cursor-default grid-cols-[140px_180px_1fr_70px] items-center gap-4 border-b border-[var(--rule-soft)] px-1 py-3 transition-colors ${
               highlightedEmailId === e._id
                 ? "bg-[var(--card-hi)]"
                 : "hover:bg-[var(--card)]"
             }`}
+            style={{ opacity: reclassifying ? 0.5 : 1 }}
           >
-            {/* color square — the label, rendered as a tiny block */}
-            <span
-              className="mt-1.5 inline-block h-2 w-2 shrink-0"
-              style={{
-                background: accent ?? "var(--mute-dim)",
-                opacity: reclassifying ? 0.35 : accent ? 1 : 0.4,
-              }}
-              title={bucket?.name ?? "Unsorted"}
-            />
-            <div className="grid min-w-0 flex-1 grid-cols-[140px_1fr] items-baseline gap-3 sm:grid-cols-[180px_1fr]">
-              <p className="truncate text-[14px] font-semibold leading-tight text-[var(--ink)]">
-                {extractName(e.from)}
-              </p>
-              <div className="min-w-0">
-                <p className="truncate text-[14px] leading-tight text-[var(--ink)]">
-                  <span className="font-medium">{e.subject}</span>
-                  <span className="text-[var(--mute)]"> — {e.snippet}</span>
-                </p>
-              </div>
-            </div>
-            <span className="num shrink-0 text-[11px] text-[var(--mute)] tabular-nums">
+            <LabelChip name={bucket?.name ?? "Unsorted"} color={accent} />
+            <p className="truncate text-[14px] font-semibold leading-tight text-[var(--ink)]">
+              {extractName(e.from)}
+            </p>
+            <p className="min-w-0 truncate text-[14px] leading-tight text-[var(--ink)]">
+              <span className="font-medium">{e.subject}</span>
+              <span className="text-[var(--mute)]">
+                {" "}— {decodeEntities(e.snippet)}
+              </span>
+            </p>
+            <span className="num text-right text-[11px] text-[var(--mute)] tabular-nums">
               {formatDate(e.date)}
             </span>
           </li>
@@ -531,6 +522,46 @@ function EmailList({
       })}
     </ul>
   );
+}
+
+function LabelChip({
+  name,
+  color,
+}: {
+  name: string;
+  color: string | null;
+}) {
+  if (!color) {
+    return (
+      <span className="kicker truncate text-[var(--mute-dim)]" title={name}>
+        {name}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex items-center gap-1.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em]"
+      style={{ color }}
+      title={name}
+    >
+      <span
+        className="inline-block h-2 w-2 shrink-0"
+        style={{ background: color }}
+      />
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
+// Gmail snippets come back HTML-encoded (we&#39;re instead of we're). Decode
+// via a textarea so &amp; / &#39; / &lt; / etc render as their characters.
+let __decoder: HTMLTextAreaElement | null = null;
+function decodeEntities(s: string): string {
+  if (!s) return "";
+  if (!s.includes("&")) return s;
+  if (!__decoder) __decoder = document.createElement("textarea");
+  __decoder.innerHTML = s;
+  return __decoder.value;
 }
 
 function ChatToggle({

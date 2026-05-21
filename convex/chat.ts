@@ -45,11 +45,14 @@ export const askInbox = action({
     try {
       // 1. Retrieve top-K emails from the user's namespace.
       const namespace = `user:${userId}`;
+      // No threshold — text-embedding-3-small similarities cluster
+      // 0.1–0.4 for typical inbox content, so any cutoff aggressive enough
+      // to filter junk also drops real hits. Trust the top-K ordering and
+      // let the LLM judge relevance from the retrieved emails.
       const search = await rag.search(ctx, {
         namespace,
         query: question,
         limit: RAG_TOP_K,
-        vectorScoreThreshold: 0.25,
       });
 
       const retrievedEmailIds = search.results
