@@ -84,13 +84,44 @@ export const classifyEmailBatch = internalAction({
         )
         .join("\n\n");
 
-    try {
-      const { object } = await generateObject({
-        model,
-        schema,
-        system,
-        prompt: userPrompt,
+    // Retry transient failures (rate limits, brief network blips, malformed
+    // first response) with exponential backoff before giving up. Most prod
+    // classification failures we see are transient.
+    const MAX_ATTEMPTS = 3;
+    const BACKOFF_MS = [0, 1000, 3000];
+    let lastErr: unknown = null;
+    let object: { predictions: Array<{ id: string; bucket: string; reason: string }> } | null = null;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (BACKOFF_MS[attempt] > 0) {
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+      }
+      try {
+        const result = await generateObject({
+          model,
+          schema,
+          system,
+          prompt: userPrompt,
+        });
+        object = result.object;
+        break;
+      } catch (err) {
+        lastErr = err;
+        console.warn(
+          `classifyEmailBatch attempt ${attempt + 1}/${MAX_ATTEMPTS} failed for ${args.modelId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    if (!object) {
+      // All retries exhausted — surface failure. markClassificationFailed
+      // preserves any prior bucket the email already had.
+      await ctx.runMutation(internal.inbox.markClassificationFailed, {
+        emailIds: emails.map((e) => e._id),
+        error: lastErr instanceof Error ? lastErr.message : String(lastErr),
       });
+      return { classified: 0, failed: emails.length };
+    }
+
+    try {
       const byId = new Map(object.predictions.map((p) => [p.id, p]));
       const results: {
         emailId: Id<"emails">;
@@ -130,6 +161,8 @@ export const classifyEmailBatch = internalAction({
       }
       return { classified: results.length, failed: unmapped.length };
     } catch (err) {
+      // Post-LLM bookkeeping failed (rare — would be a Convex write error,
+      // not a model error). Don't retry the LLM call; just surface.
       await ctx.runMutation(internal.inbox.markClassificationFailed, {
         emailIds: emails.map((e) => e._id),
         error: err instanceof Error ? err.message : String(err),
