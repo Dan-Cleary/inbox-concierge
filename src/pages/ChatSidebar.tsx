@@ -29,6 +29,7 @@ export default function ChatSidebar({
   onCitationClick?: (emailId: Id<"emails">) => void;
 }) {
   const me = useQuery(api.inbox.currentUser);
+  const suggestions = useQuery(api.chats.suggestedPrompts);
   const getOrCreateChat = useAction(api.chats.getOrCreateChat);
   const sendMessage = useAction(api.chats.sendMessage);
   const clearChat = useMutation(api.chats.clearChat);
@@ -208,6 +209,7 @@ export default function ChatSidebar({
           {empty ? (
             <EmptyState
               firstName={firstName}
+              suggestions={suggestions ?? []}
               onPick={(p) => {
                 setInput(p);
                 inputRef.current?.focus();
@@ -275,18 +277,23 @@ export default function ChatSidebar({
   );
 }
 
-const SUGGESTIONS: Array<{ icon: React.ReactNode; label: string }> = [
-  { icon: <SearchIcon />, label: "What's most important in my inbox right now?" },
-  { icon: <MailIcon />, label: "Anything from Sentry this week?" },
-  { icon: <SparkleIcon />, label: "Are there cold sales emails I can ignore?" },
-  { icon: <ClockIcon />, label: "What needs a reply today?" },
+// Generic icon set, cycled across suggestion rows. We don't try to map
+// icons to question semantics — text already tells the story, the icon
+// is just a visual anchor.
+const SUGGESTION_ICONS = [
+  <SearchIcon key="s" />,
+  <MailIcon key="m" />,
+  <SparkleIcon key="sp" />,
+  <ClockIcon key="c" />,
 ];
 
 function EmptyState({
   firstName,
+  suggestions,
   onPick,
 }: {
   firstName: string;
+  suggestions: string[];
   onPick: (s: string) => void;
 }) {
   return (
@@ -295,15 +302,17 @@ function EmptyState({
         Hi {firstName}, how can I help?
       </h2>
       <div className="mt-5 space-y-1.5">
-        {SUGGESTIONS.map((s) => (
+        {suggestions.map((label, i) => (
           <button
-            key={s.label}
+            key={label}
             type="button"
-            onClick={() => onPick(s.label)}
+            onClick={() => onPick(label)}
             className="flex w-full items-center gap-3 border border-[var(--rule)] bg-[var(--card)] px-3 py-2.5 text-left text-[13px] text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--card-hi)]"
           >
-            <span className="shrink-0 text-[var(--mute)]">{s.icon}</span>
-            <span className="truncate">{s.label}</span>
+            <span className="shrink-0 text-[var(--mute)]">
+              {SUGGESTION_ICONS[i % SUGGESTION_ICONS.length]}
+            </span>
+            <span className="truncate">{label}</span>
           </button>
         ))}
       </div>

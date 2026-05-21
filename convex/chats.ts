@@ -127,6 +127,54 @@ export const listThreadMessages = query({
   },
 });
 
+// Public: 4 starter prompts derived from the user's actual labels. We
+// keep two universal openers (most-important / can-ignore) and template
+// two more from the user's two most-populated labels so the suggestions
+// hit something that actually exists in their inbox.
+export const suggestedPrompts = query({
+  args: {},
+  handler: async (ctx): Promise<string[]> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [
+        "What's most important in my inbox right now?",
+        "What needs a reply today?",
+        "What can I ignore?",
+        "Summarize my inbox.",
+      ];
+    }
+    const buckets = await ctx.db
+      .query("buckets")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const emails = await ctx.db
+      .query("emails")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const counts = new Map<string, number>();
+    for (const e of emails) {
+      if (e.bucketId) counts.set(e.bucketId, (counts.get(e.bucketId) ?? 0) + 1);
+    }
+    // Sort labels by count (most-populated first); prefer custom labels
+    // over defaults so suggestions surface what the user has personalized.
+    const ranked = [...buckets].sort((a, b) => {
+      const ad = a.isDefault ? 1 : 0;
+      const bd = b.isDefault ? 1 : 0;
+      if (ad !== bd) return ad - bd;
+      return (counts.get(b._id) ?? 0) - (counts.get(a._id) ?? 0);
+    });
+    const top = ranked.filter((b) => (counts.get(b._id) ?? 0) > 0).slice(0, 2);
+
+    const prompts: string[] = [
+      "What's most important in my inbox right now?",
+    ];
+    if (top[0]) prompts.push(`What's in ${top[0].name} this week?`);
+    if (top[1]) prompts.push(`Summarize ${top[1].name}.`);
+    prompts.push("What needs a reply today?");
+    return prompts.slice(0, 4);
+  },
+});
+
 // Public: clear the chat — delete the chat row + spawn a fresh thread.
 // The Agent component's old thread/messages remain in its tables (which
 // is fine; they're scoped to the dead threadId).
