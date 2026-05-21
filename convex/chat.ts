@@ -12,13 +12,14 @@ import type { Id } from "./_generated/dataModel";
 const CHAT_MODEL = "claude-sonnet-4-6";
 const RAG_TOP_K = 8;
 
-const SYSTEM_PROMPT = `You are an assistant that answers questions about the user's email inbox. You have access to retrieved emails relevant to each question.
+const SYSTEM_PROMPT = `You are an assistant that helps the user with their email inbox. When their question is about email, you have access to retrieved emails relevant to the question.
 
 Rules:
-- Ground every answer in the retrieved emails. If the emails don't contain the answer, say so plainly.
-- Be specific: name senders, reference subject lines, quote short snippets when useful.
+- If the user is making small talk (greetings, "thanks", short pleasantries), respond naturally in one short sentence. Do NOT mention emails or say "I couldn't find any."
+- If the user asks an email-related question, ground your answer in the retrieved emails. Be specific: name senders, reference subject lines, quote short snippets when useful.
+- If the retrieved emails clearly don't contain the answer to an email question, say so plainly and offer to help with something else.
 - Keep answers tight. Bullets when listing multiple emails; prose when summarizing.
-- Cite emails by their bracketed [id] tags inline at the end of the relevant sentence, like [k1234abcd]. Use the exact id from the retrieved email block.
+- Cite emails by their bracketed [id] tags inline at the end of the relevant sentence, like [k1234abcd]. Use the exact id from the retrieved email block. Skip citations entirely for small talk.
 - Never fabricate senders, subjects, or content not present in the retrieved emails.`;
 
 // Public: ask a question about the user's inbox.
@@ -80,22 +81,18 @@ export const askInbox = action({
         date: number;
       }>;
 
-      if (emails.length === 0) {
-        await ctx.runMutation(internal.chatDb.finalizeAssistantMessage, {
-          messageId: assistantMessageId,
-          content:
-            "I couldn't find any emails matching that question in your inbox.",
-          citations: [],
-        });
-        return { assistantMessageId };
-      }
-
-      const contextBlock = emails
-        .map(
-          (e) =>
-            `[${e._id}] From: ${e.from} | ${formatDateForPrompt(e.date)}\nSubject: ${e.subject}\nSnippet: ${e.snippet}`,
-        )
-        .join("\n\n");
+      // Always call the LLM, even when there are no retrieved emails.
+      // The system prompt handles small talk vs no-results vs real
+      // questions. Canned "couldn't find" responses break the chat feel.
+      const contextBlock =
+        emails.length > 0
+          ? emails
+              .map(
+                (e) =>
+                  `[${e._id}] From: ${e.from} | ${formatDateForPrompt(e.date)}\nSubject: ${e.subject}\nSnippet: ${e.snippet}`,
+              )
+              .join("\n\n")
+          : "(no relevant emails retrieved — respond conversationally if appropriate)";
 
       const userPrompt = `Question: ${question}\n\nRetrieved emails:\n\n${contextBlock}`;
 

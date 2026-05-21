@@ -419,12 +419,12 @@ function LabelRow({
 }) {
   return (
     <li
-      className={`group flex cursor-pointer items-center justify-between border-b border-[var(--rule-soft)] py-2 transition-colors ${
+      className={`group flex cursor-pointer items-center justify-between border-b border-[var(--rule-soft)] px-1 py-2.5 transition-colors ${
         active ? "bg-[var(--card)]" : "hover:bg-[var(--card)]"
       }`}
       onClick={onClick}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {bullet === "hollow" ? (
           <span className="inline-block h-2.5 w-2.5 shrink-0 border border-[var(--ink)]" />
         ) : colorHex ? (
@@ -497,21 +497,23 @@ function EmailList({
           <li
             key={e._id}
             data-email-id={e._id}
-            className={`grid cursor-default grid-cols-[140px_180px_1fr_70px] items-center gap-4 border-b border-[var(--rule-soft)] px-1 py-3 transition-colors ${
+            className={`grid cursor-default grid-cols-[200px_1fr_70px] items-center gap-4 border-b border-[var(--rule-soft)] px-2 py-4 transition-colors ${
               highlightedEmailId === e._id
                 ? "bg-[var(--card-hi)]"
                 : "hover:bg-[var(--card)]"
             }`}
             style={{ opacity: reclassifying ? 0.5 : 1 }}
           >
-            <LabelChip name={bucket?.name ?? "Unsorted"} color={accent} />
             <p className="truncate text-[14px] font-semibold leading-tight text-[var(--ink)]">
               {extractName(e.from)}
             </p>
-            <p className="min-w-0 truncate text-[14px] leading-tight text-[var(--ink)]">
-              <span className="font-medium">{e.subject}</span>
-              <span className="text-[var(--mute)]">
-                {" "}— {decodeEntities(e.snippet)}
+            <p className="flex min-w-0 items-baseline gap-2 truncate text-[14px] leading-tight text-[var(--ink)]">
+              <LabelChip name={bucket?.name ?? "Unsorted"} color={accent} />
+              <span className="min-w-0 truncate">
+                <span className="font-medium">{e.subject}</span>
+                <span className="text-[var(--mute)]">
+                  {" "}— {decodeEntities(e.snippet)}
+                </span>
               </span>
             </p>
             <span className="num text-right text-[11px] text-[var(--mute)] tabular-nums">
@@ -533,22 +535,21 @@ function LabelChip({
 }) {
   if (!color) {
     return (
-      <span className="kicker truncate text-[var(--mute-dim)]" title={name}>
+      <span
+        className="shrink-0 border border-[var(--rule)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--mute-dim)]"
+        title={name}
+      >
         {name}
       </span>
     );
   }
   return (
     <span
-      className="flex items-center gap-1.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em]"
-      style={{ color }}
+      className="shrink-0 border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
+      style={{ color, borderColor: color }}
       title={name}
     >
-      <span
-        className="inline-block h-2 w-2 shrink-0"
-        style={{ background: color }}
-      />
-      <span className="truncate">{name}</span>
+      {name}
     </span>
   );
 }
