@@ -10,22 +10,12 @@ export default function AboutPage() {
         <h1 className="mt-2 text-[28px] font-medium leading-tight tracking-tight">
           Inbox Concierge — for Tenex.
         </h1>
-        <p className="mt-2 text-[13px] text-[var(--mute)]">
-          Built by Dan Cleary. Live at{" "}
-          <a
-            href="https://inbox-concierge-dan.vercel.app"
-            className="underline decoration-[var(--moss)] underline-offset-2"
-          >
-            inbox-concierge-dan.vercel.app
-          </a>
-          .
-        </p>
       </header>
 
       <Section
         kicker="The bar"
-        title="Systems, not demos."
-        body="Tenex's brief: ship AI-native speed paired with elite-level engineering rigor. The three criteria below are taken verbatim from the prompt."
+        title=""
+        body=""
       >
         <CriterionList
           items={[
@@ -33,19 +23,24 @@ export default function AboutPage() {
               label: "Production quality",
               body: "Modular, linted, edge-case aware (error handling, rate limits).",
               evidence: [
-                "TS strict + ESLint clean; 66 vitest tests + convex-test integration tests for label mutations",
-                "GitHub Actions CI: lint → build → test on every push",
-                "Durable Convex Workflow for classification (batch 10, concurrency 3) survives action timeouts",
-                "Retry-with-backoff on transient classifier failures; prior label preserved on retry",
+                "Modular: convex/ is split by bounded context — inbox, workflows, inboxAgent, rag, evals, classify — each file owns one job and is independently testable",
+                "Linted: TS strict + ESLint, 0 errors on `npm run lint`; CI gates every push (lint → build → test)",
+                "Tested: 66 vitest tests, convex-test integration tests for label mutations, RTL for components",
+                "Error handling: classifier failures retry with exponential backoff; on permanent failure, the email's prior label is preserved (most failures are transient)",
+                "Rate limits: Gmail 429s caught with exponential backoff in the sync action; LLM provider retries are handled by the AI SDK; classification workflow caps concurrency at 3 to avoid spiking provider quota",
+                "Durable: Convex Workflow for classification survives action timeouts (10-min limit) — 200 emails in batches of 10, resumable",
               ],
             },
             {
               label: "AI-native speed",
-              body: "Used AI as a force multiplier — verified, not vibes.",
+              body: "Used AI to build ~10× faster — and verified the output instead of trusting it.",
               evidence: [
-                "Built end-to-end in ~2 days, part-time, with Claude Code + gstack skills",
-                "Every LLM-classified email is shown to the user with its bucket — drift is visible, not hidden",
-                "Multi-model eval harness (8 models, real dataset) ships in the app, not a notebook",
+                "Speed: ~2 days, part-time, end-to-end with Claude Code + gstack skills (planning, design review, QA loops)",
+                "Verified — visible state: every LLM-assigned label renders on every email row so drift is observable, not buried in a confidence score",
+                "Verified — eval harness: locked GPT-5.5 dataset benchmarks every model on the same examples; cost-vs-accuracy scatter shipped in the app, not a notebook",
+                "Verified — tests: 66 vitest + convex-test cases cover bucket CRUD, the pending-changes accumulator, default-label guards, and label-cap enforcement",
+                "Verified — local CI gate: lint + build + test runs locally before every push (lesson learned the hard way)",
+                "Refined — every prompt change is checked against the locked dataset before merging; classifier prompts iterated 4-5 times this way",
               ],
             },
             {
