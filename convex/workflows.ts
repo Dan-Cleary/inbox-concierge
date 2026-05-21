@@ -41,14 +41,18 @@ export const classifyInboxWorkflow = workflow.define({
         ),
       );
     }
-    // After classification finishes, fire the discovery agent so the UI
-    // can surface bucket suggestions. Skip during reclassify (we don't want
-    // a feedback loop — discovery already saw this inbox last cycle).
-    if (args.runDiscovery) {
-      await step.runAction(internal.agents.discoverBuckets, {
-        userId: args.userId,
-      });
-    }
+    // Post-classification: kick off RAG embedding (idempotent: only embeds
+    // emails missing embeddingId) and optionally run bucket discovery.
+    // Both run in parallel — embeddings don't depend on bucket discovery
+    // and vice versa.
+    await Promise.all([
+      step.runAction(internal.rag.embedInbox, { userId: args.userId }),
+      args.runDiscovery
+        ? step.runAction(internal.agents.discoverBuckets, {
+            userId: args.userId,
+          })
+        : Promise.resolve(),
+    ]);
   },
 });
 

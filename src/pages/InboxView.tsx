@@ -3,8 +3,10 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import { useCallback, useEffect, useState as useStateExtra } from "react";
 import BucketCreator from "./BucketCreator";
 import BucketSuggestions from "./BucketSuggestions";
+import ChatSidebar from "./ChatSidebar";
 
 type Bucket = Doc<"buckets">;
 type Email = Doc<"emails">;
@@ -64,6 +66,26 @@ export default function InboxView() {
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useStateExtra(false);
+  const [highlightedEmailId, setHighlightedEmailId] = useStateExtra<
+    Id<"emails"> | null
+  >(null);
+
+  const handleCitationClick = useCallback((emailId: Id<"emails">) => {
+    setHighlightedEmailId(emailId);
+    // Use requestAnimationFrame so the scroll happens after the row gets
+    // the highlight class — feels less janky than a raw setTimeout.
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-email-id="${emailId}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!highlightedEmailId) return;
+    const t = setTimeout(() => setHighlightedEmailId(null), 2200);
+    return () => clearTimeout(t);
+  }, [highlightedEmailId]);
 
   if (
     buckets === undefined ||
@@ -204,9 +226,51 @@ export default function InboxView() {
             {viewTitle(selected, buckets, emails.length, unclassifiedCount, bucketCounts)}
           </h2>
         </div>
-        <EmailList emails={filteredEmails} buckets={buckets} />
+        <EmailList
+          emails={filteredEmails}
+          buckets={buckets}
+          highlightedEmailId={highlightedEmailId}
+        />
       </section>
+
+      <ChatToggle open={chatOpen} onToggle={() => setChatOpen((v) => !v)} />
+      <ChatSidebar
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        onCitationClick={handleCitationClick}
+      />
     </div>
+  );
+}
+
+function ChatToggle({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: () => void;
+}) {
+  if (open) return null;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-3 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105 hover:bg-neutral-800"
+      aria-label="Open inbox chat"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+      Ask your inbox
+    </button>
   );
 }
 
@@ -514,9 +578,11 @@ function BucketRow({
 function EmailList({
   emails,
   buckets,
+  highlightedEmailId,
 }: {
   emails: Email[];
   buckets: Bucket[];
+  highlightedEmailId: Id<"emails"> | null;
 }) {
   const bucketById = new Map(buckets.map((b) => [b._id, b]));
   if (emails.length === 0) {
@@ -529,7 +595,16 @@ function EmailList({
   return (
     <ul className="divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
       {emails.map((e) => (
-        <li key={e._id} className="px-3 py-3 transition-colors hover:bg-neutral-50 sm:px-4">
+        <li
+          key={e._id}
+          data-email-id={e._id}
+          className={`px-3 py-3 transition-colors sm:px-4 ${
+            highlightedEmailId === e._id
+              ? "bg-yellow-50 ring-2 ring-yellow-300"
+              : "hover:bg-neutral-50"
+          }`}
+        >
+          {/* the rest of the row stays the same */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">

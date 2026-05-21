@@ -214,6 +214,56 @@ export const getAllEmailIds = internalQuery({
   },
 });
 
+export const getEmailsForEmbedding = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const emails = await ctx.db
+      .query("emails")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return emails
+      .filter((e) => !e.embeddingId)
+      .map((e) => ({
+        _id: e._id,
+        subject: e.subject,
+        from: e.from,
+        snippet: e.snippet,
+      }));
+  },
+});
+
+export const markEmailEmbedded = internalMutation({
+  args: { emailId: v.id("emails"), embeddingId: v.string() },
+  handler: async (ctx, { emailId, embeddingId }) => {
+    await ctx.db.patch(emailId, { embeddingId });
+  },
+});
+
+export const getEmailsByIdPreservingOrder = internalQuery({
+  args: { emailIds: v.array(v.id("emails")) },
+  handler: async (ctx, { emailIds }) => {
+    const out: Array<{
+      _id: Id<"emails">;
+      subject: string;
+      from: string;
+      snippet: string;
+      date: number;
+    }> = [];
+    for (const id of emailIds) {
+      const e = await ctx.db.get(id);
+      if (e)
+        out.push({
+          _id: e._id,
+          subject: e.subject,
+          from: e.from,
+          snippet: e.snippet,
+          date: e.date,
+        });
+    }
+    return out;
+  },
+});
+
 export const getBuckets = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

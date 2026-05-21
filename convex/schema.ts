@@ -152,6 +152,21 @@ export default defineSchema({
     acceptedBucketId: v.optional(v.id("buckets")),
   }).index("by_user_status", ["userId", "status"]),
 
+  // Persistent chat history for the "ask your inbox" assistant. Each user
+  // gets a single rolling thread; we don't expose multi-thread chat in v1.
+  chatMessages: defineTable({
+    userId: v.id("users"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    // Email IDs the assistant cited as evidence for an answer. UI renders
+    // these as chips that scroll/highlight the matching row.
+    citations: v.optional(v.array(v.id("emails"))),
+    // True while the assistant message is still streaming or being computed.
+    pending: v.optional(v.boolean()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   // Per-user settings (e.g. which model wins after eval).
   userSettings: defineTable({
     userId: v.id("users"),
