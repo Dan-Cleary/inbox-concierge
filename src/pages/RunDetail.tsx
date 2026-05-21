@@ -2,6 +2,7 @@ import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { roomNameFor } from "../lib/roomNames";
 
 const BUCKET_TINT: Record<string, string> = {
   Important: "bg-red-50 text-red-700",
@@ -74,7 +75,7 @@ export default function RunDetail({ runId }: { runId: Id<"evalRuns"> }) {
                       BUCKET_TINT[r.expectedBucket] ?? "bg-neutral-100"
                     }`}
                   >
-                    {r.expectedBucket}
+                    {roomNameFor(r.expectedBucket)}
                   </span>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
@@ -86,7 +87,7 @@ export default function RunDetail({ runId }: { runId: Id<"evalRuns"> }) {
                         : "bg-red-100 text-red-700"
                     }`}
                   >
-                    {r.predictedBucket}
+                    {roomNameFor(r.predictedBucket)}
                   </span>
                 </div>
               </div>

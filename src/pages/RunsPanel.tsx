@@ -5,6 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import RunDetail from "./RunDetail";
 import CostAccuracyChart from "./CostAccuracyChart";
 import PromptEditor from "./PromptEditor";
+import { roomNameFor } from "../lib/roomNames";
 
 type ModelInfo = {
   id: string;
@@ -219,9 +220,9 @@ export default function RunsPanel({
                   setSort={setSort}
                   k={b}
                   className={BUCKET_HEADER_TINT[b] ?? ""}
-                  title={`Per-bucket accuracy: ${b}`}
+                  title={`Per-bucket accuracy: ${roomNameFor(b)}`}
                 >
-                  {b}
+                  {roomNameFor(b)}
                 </SortableHeader>
               ))}
               <SortableHeader sort={sort} setSort={setSort} k="avgLatencyMs">

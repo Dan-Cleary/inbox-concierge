@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { roomNameFor } from "../lib/roomNames";
 
 const BUCKETS = ["Important", "Can wait", "Auto-archive", "Newsletter"] as const;
 
@@ -73,7 +74,7 @@ export default function DatasetTable({
                   >
                     {BUCKETS.map((b) => (
                       <option key={b} value={b}>
-                        {b}
+                        {roomNameFor(b)}
                       </option>
                     ))}
                   </select>
