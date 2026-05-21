@@ -19,7 +19,7 @@ export default function BucketSuggestions() {
       <div className="mb-1.5 flex items-center gap-1.5">
         <SparkleIcon />
         <h3 className="text-xs font-semibold text-emerald-900">
-          Suggested buckets
+          Suggested labels
         </h3>
       </div>
       <ul className="space-y-1">

@@ -36,8 +36,8 @@ export default function App() {
             Inbox Concierge
           </h1>
           <p className="mt-2 text-sm text-neutral-600 sm:text-base">
-            Sign in with Google. We classify your last 200 Gmail threads into
-            buckets — and let you create your own.
+            Sign in with Google. We sort your last 200 Gmail threads into
+            labels — and let you create your own.
           </p>
           <button
             type="button"

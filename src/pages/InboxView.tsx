@@ -52,16 +52,12 @@ export default function InboxView() {
   const stats = useQuery(api.inbox.inboxStats);
   const syncInbox = useAction(api.inbox.syncInbox);
   const startClassification = useMutation(api.workflows.startClassification);
-  const startReclassification = useMutation(
-    api.workflows.startReclassification,
-  );
   const deleteBucket = useMutation(api.inbox.deleteBucket);
   const triggerDiscovery = useAction(api.agents.triggerDiscovery);
   const { signOut } = useAuthActions();
 
   const [selected, setSelected] = useState<Selection>("all");
   const [syncing, setSyncing] = useState(false);
-  const [reclassifying, setReclassifying] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -110,18 +106,6 @@ export default function InboxView() {
     }
   };
 
-  const handleReclassify = async () => {
-    setReclassifying(true);
-    setError(null);
-    try {
-      await startReclassification({});
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setReclassifying(false);
-    }
-  };
-
   const handleDiscover = async () => {
     setDiscovering(true);
     setError(null);
@@ -164,11 +148,9 @@ export default function InboxView() {
         setMobileSidebarOpen(false);
       }}
       onDeleteBucket={(b) => {
-        if (confirm(`Delete bucket "${b.name}"?`))
+        if (confirm(`Delete label "${b.name}"?`))
           deleteBucket({ bucketId: b._id });
       }}
-      onReclassify={handleReclassify}
-      reclassifying={reclassifying}
       onDiscover={handleDiscover}
       discovering={discovering}
       onSignOut={() => void signOut()}
@@ -186,10 +168,12 @@ export default function InboxView() {
           className="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
         >
           <BucketIcon />
-          Buckets
+          Labels
         </button>
         <span className="text-xs text-neutral-500">
-          {stats.classified}/{stats.total} classified
+          {stats.classified === stats.total
+            ? `All ${stats.total} sorted`
+            : `${stats.classified}/${stats.total} sorted`}
         </span>
       </div>
 
@@ -281,7 +265,7 @@ function viewTitle(
   counts: Map<Id<"buckets">, number>,
 ): string {
   if (sel === "all") return `All (${total})`;
-  if (sel === "unclassified") return `Unclassified (${unclassified})`;
+  if (sel === "unclassified") return `Unsorted (${unclassified})`;
   const bucket = buckets.find((b) => b._id === sel);
   if (!bucket) return "Inbox";
   return `${bucket.name} (${counts.get(bucket._id) ?? 0})`;
@@ -338,8 +322,8 @@ function EmptyInboxState({
           Pull your inbox
         </h1>
         <p className="mt-1 text-sm text-neutral-600">
-          We'll fetch your last 200 Gmail threads and classify them into
-          buckets. Takes about 40 seconds.
+          We'll fetch your last 200 Gmail threads and sort them into labels.
+          Takes about 40 seconds.
         </p>
         <button
           type="button"
@@ -371,8 +355,6 @@ function Sidebar({
   selected,
   onSelect,
   onDeleteBucket,
-  onReclassify,
-  reclassifying,
   onDiscover,
   discovering,
   onSignOut,
@@ -393,8 +375,6 @@ function Sidebar({
   selected: Selection;
   onSelect: (s: Selection) => void;
   onDeleteBucket: (b: Bucket) => void;
-  onReclassify: () => void;
-  reclassifying: boolean;
   onDiscover: () => void;
   discovering: boolean;
   onSignOut: () => void;
@@ -405,6 +385,13 @@ function Sidebar({
     <div className="space-y-4">
       <StatsBar stats={stats} />
 
+      <div>
+        <div className="mb-1.5 flex items-baseline justify-between px-1">
+          <h3 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+            Labels
+          </h3>
+          <LabelCapacityBadge />
+        </div>
       <nav className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
         <BucketRow
           label="All"
@@ -414,7 +401,7 @@ function Sidebar({
         />
         {unclassifiedCount > 0 && (
           <BucketRow
-            label="Unclassified"
+            label="Unsorted"
             count={unclassifiedCount}
             active={selected === "unclassified"}
             onClick={() => onSelect("unclassified")}
@@ -435,32 +422,23 @@ function Sidebar({
           />
         ))}
       </nav>
+      </div>
 
       <BucketCreator />
 
-      <div className="space-y-2">
-        <button
-          type="button"
-          onClick={onDiscover}
-          disabled={discovering || stats.classified < 30}
-          title={
-            stats.classified < 30
-              ? "Need at least 30 classified emails before suggesting"
-              : undefined
-          }
-          className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-50"
-        >
-          {discovering ? "Looking…" : "✨ Suggest more buckets"}
-        </button>
-        <button
-          type="button"
-          onClick={onReclassify}
-          disabled={reclassifying || stats.classifying > 0 || stats.reclassifying > 0}
-          className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-        >
-          {reclassifying ? "Triggering…" : "Reclassify all"}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onDiscover}
+        disabled={discovering || stats.classified < 30}
+        title={
+          stats.classified < 30
+            ? "Need at least 30 sorted emails before suggesting"
+            : undefined
+        }
+        className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-50"
+      >
+        {discovering ? "Looking…" : "✨ Suggest labels"}
+      </button>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
@@ -489,11 +467,14 @@ function StatsBar({
 }) {
   const inFlight = stats.classifying + stats.reclassifying + stats.queued;
   const pct = stats.total > 0 ? stats.classified / stats.total : 0;
+  const done = inFlight === 0 && stats.total > 0;
   return (
     <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white p-3 text-xs shadow-sm">
       <div className="flex items-center justify-between">
         <span className="font-medium text-neutral-800">
-          {stats.classified}/{stats.total} classified
+          {done
+            ? `All ${stats.total} emails sorted`
+            : `Sorting… ${stats.classified} of ${stats.total}`}
         </span>
         {inFlight > 0 && (
           <span className="flex items-center gap-1.5 text-blue-600">
@@ -501,20 +482,42 @@ function StatsBar({
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
               <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
             </span>
-            {inFlight} processing
+            {inFlight}
           </span>
         )}
       </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
-        <div
-          className="h-full bg-neutral-900 transition-all duration-300"
-          style={{ width: `${pct * 100}%` }}
-        />
-      </div>
+      {!done && (
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+          <div
+            className="h-full bg-neutral-900 transition-all duration-300"
+            style={{ width: `${pct * 100}%` }}
+          />
+        </div>
+      )}
       {stats.failed > 0 && (
         <p className="mt-2 text-red-600">{stats.failed} failed</p>
       )}
     </div>
+  );
+}
+
+function LabelCapacityBadge() {
+  const capacity = useQuery(api.inbox.labelCapacity);
+  if (!capacity) return null;
+  const atCap = capacity.used >= capacity.max;
+  return (
+    <span
+      className={`text-[10px] tabular-nums ${
+        atCap ? "font-semibold text-amber-600" : "text-neutral-400"
+      }`}
+      title={
+        atCap
+          ? "You've hit the label cap. Delete one to make room."
+          : `${capacity.max - capacity.used} more available`
+      }
+    >
+      {capacity.used} / {capacity.max}
+    </span>
   );
 }
 
@@ -537,15 +540,16 @@ function BucketRow({
 }) {
   return (
     <div
-      className={`group flex items-center justify-between border-b border-neutral-100 px-3 py-2 transition-colors last:border-0 ${
-        active ? "bg-neutral-100" : "hover:bg-neutral-50"
+      className={`group relative flex cursor-pointer items-center justify-between border-b border-neutral-100 px-3 py-2 transition-colors last:border-0 ${
+        active
+          ? "bg-neutral-900 text-white"
+          : "hover:bg-neutral-100 hover:text-neutral-900"
       }`}
+      onClick={onClick}
     >
-      <button
-        type="button"
-        onClick={onClick}
+      <div
         className={`flex flex-1 items-center gap-2 text-left text-sm ${
-          dim ? "text-neutral-500" : "text-neutral-800"
+          dim && !active ? "text-neutral-500" : ""
         }`}
       >
         {colorClass ? (
@@ -556,15 +560,29 @@ function BucketRow({
           <span className="inline-block h-2.5 w-2.5 shrink-0"></span>
         )}
         <span className="truncate">{label}</span>
-      </button>
+      </div>
       <div className="flex items-center gap-2">
-        <span className="text-xs text-neutral-500 tabular-nums">{count}</span>
+        <span
+          className={`text-xs tabular-nums ${
+            active ? "text-neutral-300" : "text-neutral-500"
+          }`}
+        >
+          {count}
+        </span>
         {onDelete && (
           <button
             type="button"
-            onClick={onDelete}
-            className="text-xs text-neutral-300 transition-opacity hover:text-red-600 group-hover:text-neutral-400"
-            title="Delete bucket"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className={`text-xs transition-opacity hover:text-red-500 ${
+              active
+                ? "text-neutral-400 hover:text-red-300"
+                : "text-neutral-300 group-hover:text-neutral-400"
+            }`}
+            title="Delete label"
+            aria-label={`Delete label ${label}`}
           >
             ✕
           </button>

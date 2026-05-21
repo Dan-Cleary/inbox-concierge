@@ -12,6 +12,11 @@ import type { Id } from "./_generated/dataModel";
 import { DEFAULT_BUCKETS } from "./prompts";
 import { getValidAccessToken } from "./gmail";
 
+// Cap user-defined labels at MAX_LABELS to keep the LLM's bucket list short
+// (longer taxonomies degrade classification accuracy) and the UI scannable.
+// Default labels count against the cap.
+export const MAX_LABELS = 12;
+
 // ----- Buckets -------------------------------------------------------------
 
 export const seedDefaultBuckets = internalMutation({
@@ -57,8 +62,13 @@ export const createBucket = mutation({
       .query("buckets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
+    if (existing.length >= MAX_LABELS) {
+      throw new Error(
+        `You can have at most ${MAX_LABELS} labels. Delete one to make room.`,
+      );
+    }
     if (existing.some((b) => b.name.toLowerCase() === name.toLowerCase())) {
-      throw new Error("A bucket with that name already exists");
+      throw new Error("A label with that name already exists");
     }
     const sortOrder =
       existing.reduce((max, b) => Math.max(max, b.sortOrder), -1) + 1;
@@ -70,6 +80,19 @@ export const createBucket = mutation({
       sortOrder,
     });
     return bucketId;
+  },
+});
+
+export const labelCapacity = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { used: 0, max: MAX_LABELS };
+    const buckets = await ctx.db
+      .query("buckets")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return { used: buckets.length, max: MAX_LABELS };
   },
 });
 
