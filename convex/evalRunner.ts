@@ -5,6 +5,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { DEFAULT_BUCKETS } from "./prompts";
 import type { ClassifyBatchResult } from "./classify";
+import { computeAccuracy, computePerBucketAccuracy } from "./evalScoring";
 import type { Id } from "./_generated/dataModel";
 
 const BATCH_SIZE = 10;
@@ -158,18 +159,11 @@ export const runOneModel = internalAction({
         }
       }
 
-      const correct = allResults.filter((r) => r.correct).length;
-      const accuracy = allResults.length === 0 ? 0 : correct / allResults.length;
-      const perBucketAccuracy: Record<string, number> = {};
-      for (const b of DEFAULT_BUCKETS) {
-        const inBucket = allResults.filter(
-          (r) => r.expectedBucket === b.name,
-        );
-        perBucketAccuracy[b.name] =
-          inBucket.length === 0
-            ? 0
-            : inBucket.filter((r) => r.correct).length / inBucket.length;
-      }
+      const accuracy = computeAccuracy(allResults);
+      const perBucketAccuracy = computePerBucketAccuracy(
+        allResults,
+        DEFAULT_BUCKETS.map((b) => b.name),
+      );
 
       await ctx.runMutation(internal.evalsDb.writeRunResults, {
         runId: args.runId,

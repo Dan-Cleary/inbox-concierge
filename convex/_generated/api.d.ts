@@ -15,6 +15,7 @@ import type * as chats from "../chats.js";
 import type * as classify from "../classify.js";
 import type * as classifyAction from "../classifyAction.js";
 import type * as evalRunner from "../evalRunner.js";
+import type * as evalScoring from "../evalScoring.js";
 import type * as evals from "../evals.js";
 import type * as evalsDb from "../evalsDb.js";
 import type * as gmail from "../gmail.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   classify: typeof classify;
   classifyAction: typeof classifyAction;
   evalRunner: typeof evalRunner;
+  evalScoring: typeof evalScoring;
   evals: typeof evals;
   evalsDb: typeof evalsDb;
   gmail: typeof gmail;
