@@ -1,106 +1,237 @@
 # Inbox Concierge
 
-LLM-powered Gmail inbox classifier. Take-home build for Tenex.
+An AI-native Gmail triage app: sign in with Google, we auto-label your last 200 threads, and give you an agent that can search, sort, and manage your inbox for you.
 
-**Stack:** React + Vite + TypeScript + Tailwind, Convex (Agent, RAG, Workflow components), Convex Auth (Google OAuth with Gmail read scope), Anthropic + OpenAI providers via `ai` SDK.
+Take-home build for Tenex. Stack picks are calibrated to the brief: "we ship systems, not demos."
 
-## Architecture (one paragraph)
+---
 
-A Convex Workflow durably classifies 200 Gmail threads into user-defined buckets via an LLM batch pipeline (20 emails per call, 3 batches concurrent). Reactive Convex queries stream the results into the UI as they land — emails visibly reflow into their bucket as the workflow completes each batch. Creating a custom bucket triggers the workflow to re-classify all 200 against the updated bucket set. Three "wow" features layered on top: (1) a **model arena + eval harness** — a synthetic-but-human-reviewed dataset evaluates every candidate model on accuracy, cost, and latency, with persisted runs; (2) **auto-bucket discovery** — a Convex Agent proposes buckets it sees in the inbox after first classification; (3) **chat with your inbox** — a sidebar that uses the RAG component to answer natural-language questions over the corpus with citations.
+## What it does
+
+1. **Auth with Google** (Convex Auth, Gmail read-only scope, refresh-token rotation)
+2. **Pulls your last 200 Gmail threads** with concurrency-limited fetching
+3. **Classifies them in batches** via a durable Convex Workflow (10 emails/batch, 3 batches concurrent)
+4. **Lets you create custom labels** with a plain-English "what goes here?" description
+5. **Re-sorts the inbox** against the new label set when you hit Apply
+6. **Agent chat** answers questions about your inbox with citations (cites email ids inline), can also create labels / delete labels / re-sort on your behalf
+7. **Auto-bucket discovery** — a Convex Agent proposes new labels it sees in your classified inbox after the first sync
+8. **Eval harness** — a synthetic, human-reviewable dataset benchmarks every candidate classifier model on accuracy, cost, and latency, with persisted runs and a Pareto-front cost-vs-accuracy chart. Production classifier is picked from this bench.
+
+---
+
+## Architecture in one paragraph
+
+A Convex Workflow durably classifies 200 Gmail threads against the user's current label set in batches of 10 (3 in parallel). Reactive Convex queries stream results into the UI as they land; multi-tab sync is free. Label mutations (create, delete, accepted suggestions) accumulate in a `pendingLabelChanges` row; clicking **Apply & re-sort** fires one workflow over all 200 emails. The Convex RAG component embeds every email into a per-user namespace; the chat sidebar uses the Convex Agent component with five tools (`searchInbox`, `listLabels`, `createLabel`, `deleteLabel`, `runReclassify`) — the agent decides which to call, streams tokens to the UI via `useThreadMessages`, and the frontend renders markdown + inline citation chips that jump to the matching email row. Classifier model is `gpt-5.4-mini` (won the eval bench on cost/accuracy/latency).
+
+---
+
+## Stack
+
+| Layer | Tech |
+|---|---|
+| Frontend | React 19 + Vite + TypeScript + Tailwind v4 |
+| Backend | Convex (sync engine + Agent, RAG, Workflow components) |
+| Auth | Convex Auth with Google OAuth, `gmail.readonly` scope |
+| LLM providers | Anthropic (Sonnet 4.6, Haiku 4.5, Opus 4.7) + OpenAI (GPT-5.5, GPT-5.4 mini, GPT-5.4 nano) + Google (Gemini 3.5 Flash) via `ai` SDK |
+| Embeddings | OpenAI `text-embedding-3-small` (1536 dims) |
+| Hosting | Vercel (frontend) + Convex (backend) |
+
+---
 
 ## Setup
 
-### 1. Install deps
+### 1. Clone + install
 
 ```bash
+git clone <repo-url>
+cd tenex-inbox-concierge
 npm install
 ```
 
-### 2. Create the Convex project
+### 2. Spin up Convex dev
 
 ```bash
 npx convex dev
 ```
 
-This will:
-- Prompt you to log in to Convex (opens browser).
-- Create a new Convex deployment.
-- Populate `.env.local` with `VITE_CONVEX_URL` and `CONVEX_DEPLOYMENT`.
-- Generate `convex/_generated/`.
-- Watch `convex/` and push changes to the dev deployment.
+This logs you into Convex, creates a deployment, generates `convex/_generated/`, writes `.env.local`, and watches the `convex/` directory. Leave it running.
 
-Leave this running in one terminal.
-
-### 3. Set up Convex Auth
-
-In another terminal:
+### 3. Configure Convex Auth
 
 ```bash
 npx @convex-dev/auth
 ```
 
-This generates a JWT keypair and configures the necessary env vars on your Convex deployment (`JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`).
+Generates the JWT keypair and sets `JWT_PRIVATE_KEY`, `JWKS`, and `SITE_URL` on your Convex deployment.
 
-### 4. Create Google Cloud OAuth credentials
+### 4. Create a Google Cloud OAuth client
 
-1. [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials).
-2. Create (or pick) a project.
-3. Enable the **Gmail API** under Library.
-4. Configure the OAuth consent screen — External, mode "Testing", add yourself as a test user. Add the scope `.../auth/gmail.readonly`.
-5. Create credentials → **OAuth client ID** → Web application.
-6. Authorized redirect URIs:
-   - Local dev: `<your-convex-deployment-site-url>/api/auth/callback/google`
-     - Find it with `npx convex env get CONVEX_SITE_URL` or in the Convex dashboard. Looks like `https://acoustic-frog-123.convex.site`.
-   - Production: same shape, against your prod Convex deployment.
-7. Copy the **Client ID** and **Client secret**.
+1. Open [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials).
+2. **Enable the Gmail API** under Library.
+3. **OAuth consent screen**: type **External**, mode **Testing**. Add the `https://www.googleapis.com/auth/gmail.readonly` scope. Add your Gmail address as a test user.
+4. **Credentials → Create Credentials → OAuth client ID** → Web application.
+5. Authorized redirect URIs:
+   - Dev: `<your-convex-site-url>/api/auth/callback/google` (find your Convex site URL with `npx convex env get CONVEX_SITE_URL` or the dashboard)
+   - Prod: same shape against your prod Convex deployment
 
-### 5. Set Google OAuth secrets on Convex
+Copy the **Client ID** and **Client secret**.
 
-```bash
-npx convex env set AUTH_GOOGLE_ID "<your client id>"
-npx convex env set AUTH_GOOGLE_SECRET "<your client secret>"
-```
-
-### 6. Set LLM provider keys on Convex
+### 5. Set env vars on Convex
 
 ```bash
-npx convex env set OPENAI_API_KEY "$(security find-generic-password -s OPENAI_API_KEY -w)"
-npx convex env set ANTHROPIC_API_KEY "<your anthropic key>"
+npx convex env set AUTH_GOOGLE_ID "<client id>"
+npx convex env set AUTH_GOOGLE_SECRET "<client secret>"
+npx convex env set OPENAI_API_KEY "<openai key>"
+npx convex env set ANTHROPIC_API_KEY "<anthropic key>"
+npx convex env set GOOGLE_GENERATIVE_AI_API_KEY "<gemini key>"
 ```
 
-### 7. Run
+### 6. Run
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:5173, sign in with Google (the same account you added as a test user in step 4), and click **Fetch one Gmail thread**. Subject + sender + snippet means the auth + Gmail integration probe is green.
+Open `http://localhost:5175`, sign in, click **Sync inbox**.
+
+---
+
+## How to test
+
+### Eval harness (the rigor story)
+
+Navigate to `/evals`. The dataset (~44 synthetic emails with ground-truth labels, generated by GPT-5.5) is already seeded. Click **Run bench** to compare every available model on accuracy, cost, latency, and per-bucket accuracy.
+
+Each run persists in `evalRuns`. Re-run after editing the system prompt (Edit prompt → save → new prompt version → bench against it). Old runs stay tied to whichever prompt they ran with — Pareto-front chart shows cost vs accuracy.
+
+To regenerate the dataset from scratch:
+
+```bash
+npx convex run evals:generateDataset '{"targetSize":40}'
+```
+
+### Manual smoke
+
+- **Sync inbox** → 200 emails appear in ~5s, classify in ~40s, watch live reflow
+- **Create label** (`+` next to LABELS) → fill name + description → pending banner appears → **Apply & re-sort** → one workflow runs across all 200
+- **Suggested labels** banner surfaces 0–3 agent-proposed labels after first sync
+- **Ask your inbox** (bottom-right) → try:
+  - "hi" — agent replies conversationally, no tool calls
+  - "What needs a reply today?" — agent calls `searchInbox`
+  - "What labels do I have?" — agent calls `listLabels`
+  - "Make a label for emails from investors, then apply it" — agent calls `createLabel` then `runReclassify`
+  - Citation chips on assistant answers — click to scroll/highlight the source email
+
+---
 
 ## Code map
 
 ```
-src/
-  App.tsx              — sign-in + Gmail probe (current end-to-end gate)
-  main.tsx             — ConvexAuthProvider + ConvexReactClient
 convex/
-  convex.config.ts     — registers Agent, RAG, Workflow components
-  schema.ts            — authTables + emails / buckets / classificationRuns / evalRuns / evalDatasets / userSettings
-  auth.ts              — Google provider with Gmail scope + token capture
-  auth.config.ts       — JWT issuer config
-  http.ts              — auth HTTP routes
-  gmail.ts             — credential persistence + Gmail API probe action
+  schema.ts             — Convex data model
+  auth.ts               — Convex Auth + Google OAuth + Gmail token capture
+  gmail.ts              — Gmail API + shared access-token refresh
+  inbox.ts              — emails / buckets CRUD, sync action, agent-facing internal mutations
+  prompts.ts            — classification prompt template + default bucket taxonomy
+  models.ts             — eval model registry (provider, api id, $ per M)
+  classify.ts           — eval-side classifyBatch (multi-provider via ai-sdk)
+  classifyAction.ts     — prod-side classifyEmailBatch (retries, prompt-version aware)
+  workflows.ts          — durable classification + reclassification workflows
+  workflows.ts          — runReclassifyForUser (debounced via pendingLabelChanges)
+  labelChanges.ts       — pending-changes accumulator + Apply pattern
+  agents.ts             — bucket-discovery Agent (one-shot, structured output)
+  agentsDb.ts           — bucket suggestions CRUD
+  rag.ts                — Convex RAG component setup + embedInbox action
+  inboxAgent.ts         — chat Agent with 5 tools (search, listLabels, create/delete/reclassify)
+  chats.ts              — thread management (getOrCreateChat, sendMessage, listThreadMessages)
+  evals.ts              — synthetic dataset generator (GPT-5.5)
+  evalsDb.ts            — eval datasets + runs CRUD
+  evalRunner.ts         — fire-and-forget bench runner (scheduled per-model background actions)
+  promptVersions.ts     — prompt version history
+
+src/
+  App.tsx               — auth gate + sign-in card
+  Layout.tsx            — top bar (Atrium mark + Inbox/Evals tabs)
+  pages/
+    InboxView.tsx       — sidebar + email list + chat toggle
+    BucketCreator.tsx   — Create label modal
+    BucketSuggestions.tsx — suggested-labels banner
+    PendingChangesBanner.tsx — "X label changes pending — Apply" CTA
+    ChatSidebar.tsx     — Agent thread chat (useThreadMessages + toUIMessages + streaming)
+    EvalsPage.tsx       — /evals layout (Bench / Dataset tabs)
+    RunsPanel.tsx       — bench runner UI + sortable runs table
+    DatasetTable.tsx    — synthetic dataset review UI
+    RunDetail.tsx       — per-email mistake inspector
+    CostAccuracyChart.tsx — Recharts cost-vs-accuracy scatter with Pareto front
+    PromptEditor.tsx    — system prompt editor + versioning
+  components/
+    AtriumMark.tsx      — brand logo SVG
+    Select.tsx          — custom dropdown (Garden-styled)
+    ConfirmDialog.tsx   — modal + useConfirm hook
+  lib/
+    roomNames.ts        — label color palette
 ```
 
-## What's next (in build order)
+---
 
-1. ✅ Vite + Convex + Auth scaffold
-2. ⬜ Gmail bulk fetch action (200 threads) + emails table population
-3. ⬜ Email list UI
-4. ⬜ Eval dataset generation + review UI
-5. ⬜ Single-model classification workflow (4 default buckets)
-6. ⬜ Custom bucket creation → re-classification workflow
-7. ⬜ Eval harness page (multi-model)
-8. ⬜ Embedding generation + RAG setup
-9. ⬜ Chat sidebar
-10. ⬜ Auto-bucket discovery agent
-11. ⬜ Polish, README polish, video
+## Architecture decisions worth calling out
+
+- **Durable workflow over single action.** Classification of 200 emails runs inside a Convex Workflow so it survives function timeouts, can be observed mid-flight, and resumes cleanly after deploys. Each batch (10 emails) is a `step.runAction` call, so individual batch failures don't crater the whole sync.
+- **Fire-and-forget bench.** `runBench` was hitting websocket timeouts when 7 models classified in parallel via `Promise.all`. Now each model is scheduled as its own background internal action via `ctx.scheduler.runAfter(0, ...)`; the action returns immediately and rows stream into the bench table as they finish.
+- **Per-user RAG namespacing** (`user:${userId}`) isolates inboxes. Embeddings are written idempotently — re-running `embedInbox` only processes emails missing `embeddingId`.
+- **Apply pattern for label changes.** Earlier versions debounced reclassify by 1.5s after the last label mutation. That works for clicking through suggestions but fails for users who take 30s in a modal between label creations. Now: label mutations accumulate in `pendingLabelChanges`, a persistent banner surfaces the change count, one click fires one workflow.
+- **Eval-driven model selection.** Classifier is `gpt-5.4-mini` (won the bench at 86.4% accuracy / $0.0035 per 200-email run / 4s avg latency). Chat agent is `claude-haiku-4-5` for snappier streaming. Both swappable from one line each.
+- **Retry on transient classifier failures.** `classifyEmailBatch` retries 3× with exponential backoff (0ms / 1s / 3s). If all retries fail, prior bucket assignment is preserved instead of marking the email failed — most batch failures are rate limits and the prior label is still correct.
+- **HTML entity decode** on Gmail snippets. The API returns snippets HTML-encoded (`we&#39;re`); decoded client-side via reused `textarea`.
+- **Agent component for chat + auto-bucket; ai-sdk direct for classify + eval.** Agent gives us thread persistence + streaming + tool-calling out of the box. For pure structured-output tasks (classification, dataset generation), `ai-sdk`'s `generateObject` is simpler.
+
+---
+
+## Production deploy
+
+### Convex production deployment
+
+```bash
+npx convex deploy --prod
+```
+
+Set all env vars on prod the same way as dev:
+
+```bash
+npx convex env set AUTH_GOOGLE_ID "..." --prod
+npx convex env set AUTH_GOOGLE_SECRET "..." --prod
+# repeat for OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY,
+# JWT_PRIVATE_KEY, JWKS, SITE_URL (set SITE_URL to your Vercel domain)
+```
+
+### Vercel frontend
+
+1. Connect this repo to Vercel
+2. Build command: `npm run build`
+3. Output directory: `dist`
+4. Environment variables: `VITE_CONVEX_URL` = your prod Convex URL (e.g. `https://your-deployment.convex.cloud`)
+
+### Update Google OAuth for prod
+
+Add the prod Convex site URL as an authorized redirect URI in the Google Cloud Console:
+
+```
+https://<your-prod-convex-deployment>.convex.site/api/auth/callback/google
+```
+
+Update the `SITE_URL` env on prod Convex to your Vercel domain (e.g. `https://inbox-concierge.vercel.app`).
+
+### A note on OAuth verification
+
+The OAuth client is in **Testing** mode. Only emails added as Test users in the Google Cloud Console can sign in. To let other users in, either submit the app for verification (Google reviews `gmail.readonly` apps in days/weeks) or add reviewer emails as test users.
+
+---
+
+## What's not in scope
+
+- Clicking into an individual email (the assignment explicitly excluded this)
+- Compose / reply / archive
+- Multi-account support
+- Mobile-native (the UI is responsive but mobile-first wasn't the target)
+- Drag-to-reorder labels
+- Snooze / time-of-day triage

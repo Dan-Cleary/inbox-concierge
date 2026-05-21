@@ -346,6 +346,50 @@ export const createBucketForUser = internalMutation({
   },
 });
 
+// Agent-facing version of deleteBucket. Takes explicit userId; protects
+// default labels from deletion.
+export const deleteBucketForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    bucketName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const buckets = await ctx.db
+      .query("buckets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const match = buckets.find(
+      (b) => b.name.toLowerCase() === args.bucketName.toLowerCase(),
+    );
+    if (!match) {
+      throw new Error(`No label named "${args.bucketName}".`);
+    }
+    if (match.isDefault) {
+      throw new Error(
+        `"${match.name}" is a default label and can't be deleted.`,
+      );
+    }
+    // Unassign any emails in this label; the debounced reclassify will
+    // re-sort them.
+    const emails = await ctx.db
+      .query("emails")
+      .withIndex("by_user_bucket", (q) =>
+        q.eq("userId", args.userId).eq("bucketId", match._id),
+      )
+      .collect();
+    for (const e of emails) {
+      await ctx.db.patch(e._id, { bucketId: undefined });
+    }
+    await ctx.db.delete(match._id);
+    await notePendingLabelChange(
+      ctx,
+      args.userId,
+      `Removed "${match.name}" (via agent)`,
+    );
+    return { ok: true, name: match.name };
+  },
+});
+
 export const labelsWithCountsFor = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

@@ -13,6 +13,7 @@ const TOOL_LABELS: Record<string, string> = {
   searchInbox: "Searching inbox",
   listLabels: "Reading your labels",
   createLabel: "Creating a label",
+  deleteLabel: "Deleting a label",
   runReclassify: "Re-sorting your inbox",
 };
 

@@ -106,6 +106,34 @@ const createLabel = createTool({
   },
 });
 
+// Tool: deleteLabel. Removes a custom label. Default labels (Important,
+// Can wait, Auto-archive, Newsletter) are protected — the mutation will
+// throw if the agent tries.
+const deleteLabel = createTool({
+  description:
+    "Delete a custom label the user previously created. Default labels (Important, Can wait, Auto-archive, Newsletter) are protected and cannot be deleted. Use only when the user explicitly asks ('remove the X label', 'delete X'). After deleting, tell the user it's gone and that the Apply banner in the inbox will re-sort the affected emails.",
+  inputSchema: z.object({
+    name: z.string().describe("Exact name of the label to delete."),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  execute: async (ctx: any, input: { name: string }) => {
+    const userId = ctx.userId as Id<"users"> | undefined;
+    if (!userId) return { ok: false, error: "Not signed in" };
+    try {
+      const result = (await ctx.runMutation(
+        internal.inbox.deleteBucketForUser,
+        { userId, bucketName: input.name },
+      )) as { ok: true; name: string };
+      return result;
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+});
+
 // Tool: runReclassify. Re-sorts every email against the current label
 // set. Use when the user explicitly asks ('re-sort my inbox', 'run the
 // classifier again') OR after creating a label if the user wants the
@@ -144,11 +172,12 @@ Rules:
 - For questions about labels or counts ("what labels do I have?", "how many in Important?"), call listLabels.
 - For broad "summarize my inbox" questions, call listLabels first to see the label landscape, then searchInbox per label as needed.
 - When the user EXPLICITLY asks you to create a label ("create a label for X", "sort all my finance emails together"), call createLabel with a short name and a clear criterion description. After creating, tell the user what was added and that they can hit Apply in the inbox banner to re-sort right away — or ask if they want you to run it for them.
+- When the user EXPLICITLY asks to delete a label ("remove the X label", "delete the investors label"), call deleteLabel. Default labels (Important, Can wait, Auto-archive, Newsletter) are protected — if the user asks to delete one, decline politely and explain they're part of the core taxonomy.
 - When the user EXPLICITLY asks to re-sort the inbox ("re-classify", "re-sort", "run the classifier again", "apply now"), call runReclassify and tell them it's running.
 - Do not narrate ("Let me search..."). Just call the tool, then give the answer.
 - When a fact comes from a searchInbox snippet, append its citation handle: [cid:<handle>]. You may stack multiple: [cid:a][cid:b].
 - If a search returns nothing relevant, say so plainly. Do not invent senders, subjects, or content.
 - Prefer short, direct answers. Bullets when listing emails.`,
-  tools: { listLabels, searchInbox, createLabel, runReclassify },
+  tools: { listLabels, searchInbox, createLabel, deleteLabel, runReclassify },
   stopWhen: stepCountIs(8),
 });
