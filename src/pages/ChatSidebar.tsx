@@ -146,10 +146,10 @@ export default function ChatSidebar({
   const empty = uiMessages.length === 0 && !pending;
   const firstName = (me?.name ?? "").trim().split(/\s+/)[0] || "there";
 
-  const submit = async () => {
-    const prompt = input.trim();
+  const submit = async (overridePrompt?: string) => {
+    const prompt = (overridePrompt ?? input).trim();
     if (!prompt || submitting || !threadId) return;
-    setInput("");
+    if (!overridePrompt) setInput("");
     setPending(prompt);
     setSubmitting(true);
     setError(null);
@@ -210,10 +210,7 @@ export default function ChatSidebar({
             <EmptyState
               firstName={firstName}
               suggestions={suggestions ?? []}
-              onPick={(p) => {
-                setInput(p);
-                inputRef.current?.focus();
-              }}
+              onPick={(p) => void submit(p)}
             />
           ) : (
             <div className="space-y-4 pt-2">
