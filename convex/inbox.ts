@@ -11,7 +11,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
 import { DEFAULT_BUCKETS } from "./prompts";
 import { getValidAccessToken } from "./gmail";
-import { scheduleDebouncedReclassify } from "./labelChanges";
+import { notePendingLabelChange } from "./labelChanges";
 
 // Cap user-defined labels at MAX_LABELS to keep the LLM's bucket list short
 // (longer taxonomies degrade classification accuracy) and the UI scannable.
@@ -96,7 +96,7 @@ export const createBucket = mutation({
       isDefault: false,
       sortOrder,
     });
-    await scheduleDebouncedReclassify(ctx, userId);
+    await notePendingLabelChange(ctx, userId, `Added "${name}"`);
     return bucketId;
   },
 });
@@ -137,8 +137,9 @@ export const deleteBucket = mutation({
     for (const e of emails) {
       await ctx.db.patch(e._id, { bucketId: undefined });
     }
+    const deletedName = bucket.name;
     await ctx.db.delete(bucketId);
-    await scheduleDebouncedReclassify(ctx, userId);
+    await notePendingLabelChange(ctx, userId, `Removed "${deletedName}"`);
   },
 });
 

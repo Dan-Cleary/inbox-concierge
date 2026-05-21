@@ -2,13 +2,8 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 
-// Two exports:
-// - `CreateLabelButton`: a tiny + icon button intended to sit inline with
-//   the "Labels" header. Opens the modal.
-// - default `BucketCreator`: legacy full-width button (still useful for
-//   empty-state cases); also opens the same modal.
-//
-// Both share `CreateLabelModal` so the create flow stays in one place.
+// Garden voice: "Build a room", not "Create label". The + button is small
+// and sits inline with the sidebar's "Rooms" kicker.
 
 export function CreateLabelButton() {
   const capacity = useQuery(api.inbox.labelCapacity);
@@ -22,15 +17,15 @@ export function CreateLabelButton() {
         disabled={atCap}
         title={
           atCap
-            ? `You can have at most ${capacity?.max} labels. Delete one to make room.`
-            : "Create label"
+            ? `You can have at most ${capacity?.max} rooms. Remove one to make room.`
+            : "Build a room"
         }
-        aria-label="Create label"
-        className="inline-flex h-5 w-5 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Build a room"
+        className="inline-flex h-5 w-5 items-center justify-center text-[var(--mute)] transition-colors hover:bg-[var(--card)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
       >
         <PlusIcon />
       </button>
-      {open && <CreateLabelModal onClose={() => setOpen(false)} />}
+      {open && <BuildRoomModal onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -45,17 +40,17 @@ export default function BucketCreator() {
         type="button"
         onClick={() => setOpen(true)}
         disabled={atCap}
-        className="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--bg)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink)] transition-colors hover:bg-[var(--card)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         <PlusIcon />
-        Create label
+        Build a room
       </button>
-      {open && <CreateLabelModal onClose={() => setOpen(false)} />}
+      {open && <BuildRoomModal onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function CreateLabelModal({ onClose }: { onClose: () => void }) {
+function BuildRoomModal({ onClose }: { onClose: () => void }) {
   const createBucket = useMutation(api.inbox.createBucket);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -64,9 +59,32 @@ function CreateLabelModal({ onClose }: { onClose: () => void }) {
 
   const canSubmit = name.trim().length > 0 && description.trim().length > 0;
 
+  const suggestions = [
+    {
+      name: "From investors",
+      desc: "Emails from venture capitalists, angel investors, or funds about funding, intros, or due diligence.",
+    },
+    {
+      name: "Finance",
+      desc: "Invoices, payments, bank statements, expense reports, and other money-related correspondence.",
+    },
+    {
+      name: "Recruiters",
+      desc: "Cold and warm outreach from technical or executive recruiters about open roles.",
+    },
+    {
+      name: "From the team",
+      desc: "Messages from internal teammates about ongoing projects, reviews, and decisions.",
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 sm:items-center">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(22,34,26,0.45)] p-4 sm:items-center"
+      onClick={onClose}
+    >
       <form
+        onClick={(e) => e.stopPropagation()}
         onSubmit={async (e) => {
           e.preventDefault();
           if (!canSubmit) return;
@@ -77,8 +95,6 @@ function CreateLabelModal({ onClose }: { onClose: () => void }) {
               name: name.trim(),
               description: description.trim(),
             });
-            // Reclassify is scheduled server-side (debounced) — UI doesn't
-            // need to trigger it.
             onClose();
           } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
@@ -86,74 +102,99 @@ function CreateLabelModal({ onClose }: { onClose: () => void }) {
             setSubmitting(false);
           }
         }}
-        className="w-full max-w-md rounded-lg bg-white shadow-xl"
+        className="w-full max-w-[480px] border border-[var(--ink)] bg-[var(--card-hi)]"
       >
-        <header className="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
-          <h3 className="text-base font-semibold">Create label</h3>
+        <header className="flex items-center justify-between border-b border-[var(--rule)] px-8 py-5">
+          <div>
+            <p className="kicker text-[var(--moss)]">Build a room</p>
+            <h3 className="mt-1 text-[22px] font-medium tracking-tight">
+              What goes in here?
+            </h3>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-neutral-400 hover:text-neutral-700"
+            className="text-[var(--mute)] hover:text-[var(--ink)]"
             aria-label="Close"
           >
             ✕
           </button>
         </header>
-        <div className="space-y-4 px-5 py-4">
+        <div className="space-y-5 px-8 py-6">
           <div>
             <label
-              htmlFor="label-name"
-              className="block text-xs font-medium text-neutral-700"
+              htmlFor="room-name"
+              className="kicker mb-1.5 block text-[var(--mute)]"
             >
-              Label name
+              Name the room
             </label>
             <input
-              id="label-name"
+              id="room-name"
               type="text"
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={30}
               placeholder="From investors"
-              className="mt-1 block w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none"
+              className="block w-full border-b border-[var(--ink)] bg-transparent py-1.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--mute-dim)] focus:outline-none focus:border-b-2 focus:border-[var(--moss)] focus:py-[5px]"
             />
           </div>
           <div>
             <label
-              htmlFor="label-desc"
-              className="block text-xs font-medium text-neutral-700"
+              htmlFor="room-desc"
+              className="kicker mb-1.5 block text-[var(--mute)]"
             >
-              What emails should go here?
+              Match these
             </label>
             <textarea
-              id="label-desc"
+              id="room-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              placeholder="Emails from venture capitalists, angel investors, or fund staff about funding rounds, intros, or due diligence."
-              className="mt-1 block w-full resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none"
+              placeholder="Emails from VCs, angel investors, or fund staff about funding rounds, intros, or due diligence."
+              className="block w-full resize-none border-b border-[var(--ink)] bg-transparent py-1.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--mute-dim)] focus:outline-none focus:border-b-2 focus:border-[var(--moss)] focus:py-[5px]"
             />
-            <p className="mt-1 text-[11px] text-neutral-500">
+            <p className="mt-1 text-[11px] text-[var(--mute)]">
               Plain English. The clearer your description, the better the
-              labeling.
+              sorting.
             </p>
           </div>
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div>
+            <p className="kicker mb-2 text-[var(--mute)]">Suggestions</p>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestions.map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => {
+                    setName(s.name);
+                    setDescription(s.desc);
+                  }}
+                  className="border border-[var(--rule)] bg-[var(--bg)] px-2 py-1 text-[11px] text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--card)]"
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && (
+            <p className="text-[11px] text-[var(--alert)]">{error}</p>
+          )}
         </div>
-        <footer className="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3">
+        <footer className="flex items-center justify-end gap-2 border-t border-[var(--rule)] px-8 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+            className="border border-[var(--ink)] bg-[var(--bg)] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink)] hover:bg-[var(--card)]"
           >
-            Cancel
+            Back
           </button>
           <button
             type="submit"
             disabled={!canSubmit || submitting}
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            className="border border-[var(--ink)] bg-[var(--ink)] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bg)] hover:bg-[var(--ink-soft)] disabled:opacity-50"
           >
-            {submitting ? "Creating…" : "Create label"}
+            {submitting ? "Building…" : "Build room"}
           </button>
         </footer>
       </form>
@@ -167,7 +208,7 @@ function PlusIcon() {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.2"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
       className="h-3.5 w-3.5"

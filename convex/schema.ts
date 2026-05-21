@@ -167,8 +167,17 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
 
-  // Tracks the latest scheduled reclassify per user so subsequent label
-  // changes can cancel + reschedule (debouncing across rapid mutations).
+  // Pending label changes per user. Accumulates as the user creates/
+  // deletes labels and accepts suggestions; cleared on Apply.
+  pendingLabelChanges: defineTable({
+    userId: v.id("users"),
+    changeCount: v.number(),
+    summaries: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // Legacy: kept so old data isn't lost. No new writes after the
+  // Apply-pattern refactor.
   reclassifyJobs: defineTable({
     userId: v.id("users"),
     scheduledFnId: v.id("_scheduled_functions"),

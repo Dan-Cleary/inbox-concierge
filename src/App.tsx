@@ -1,6 +1,7 @@
 import { useConvexAuth } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import InboxView from "./pages/InboxView";
+import AtriumMark from "./components/AtriumMark";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -9,45 +10,34 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-sm text-neutral-500">Loading…</div>
+        <p className="kicker">Loading</p>
       </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto flex min-h-[calc(100vh-12rem)] max-w-md items-center pt-8 sm:pt-12">
-        <div className="w-full rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm sm:p-10">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-900 text-white">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-6 w-6"
-            >
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <path d="M3 7l9 6 9-6" />
-            </svg>
+      <div className="mx-auto flex min-h-[calc(100vh-12rem)] max-w-md items-center">
+        <div className="w-full border border-[var(--ink)] bg-[var(--card-hi)] p-10 text-center">
+          <div className="mx-auto inline-block">
+            <AtriumMark size={44} />
           </div>
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
-            Inbox Concierge
+          <p className="kicker mt-5 text-[var(--moss)]">Inbox concierge</p>
+          <h1 className="mt-2 text-[28px] font-medium leading-tight tracking-tight">
+            The room is locked.
           </h1>
-          <p className="mt-2 text-sm text-neutral-600 sm:text-base">
-            Sign in with Google. We sort your last 200 Gmail threads into
-            labels — and let you create your own.
+          <p className="mt-2 text-[13px] text-[var(--mute)]">
+            Sign in with Google. We'll sort your last 200 threads into rooms.
           </p>
           <button
             type="button"
             onClick={() => void signIn("google")}
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800"
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--bg)] transition-colors hover:bg-[var(--ink-soft)]"
           >
             <GoogleIcon />
             Continue with Google
           </button>
-          <p className="mt-4 text-xs text-neutral-400">
+          <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-[var(--mute-dim)]">
             Gmail read-only. We never send, reply, or modify.
           </p>
         </div>

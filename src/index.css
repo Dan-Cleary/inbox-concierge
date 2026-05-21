@@ -1,12 +1,91 @@
 @import "tailwindcss";
 
+/* ───── Garden brand tokens ────────────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --bg: #efede3; /* Linen */
+  --card: #f8f6ec; /* Bleached */
+  --card-hi: #fcfaf1;
+
+  /* Ink */
+  --ink: #16221a; /* Loam */
+  --ink-soft: #2d3d32;
+  --mute: #6e7068; /* Stone */
+  --mute-dim: #9b9e94;
+
+  /* Accent */
+  --moss: #3f5a3a;
+  --sage: #9cad81;
+
+  /* Rules */
+  --rule: rgba(22, 34, 26, 0.1);
+  --rule-soft: rgba(22, 34, 26, 0.06);
+
+  /* Status */
+  --alert: #a33a2e;
+
+  /* Fonts */
+  --font-sans:
+    "Inter Tight", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
+}
+
+/* Override Tailwind defaults to Garden. */
+@theme {
+  --color-bg: #efede3;
+  --color-card: #f8f6ec;
+  --color-cardHi: #fcfaf1;
+  --color-ink: #16221a;
+  --color-ink-soft: #2d3d32;
+  --color-mute: #6e7068;
+  --color-mute-dim: #9b9e94;
+  --color-moss: #3f5a3a;
+  --color-sage: #9cad81;
+  --color-rule: rgba(22, 34, 26, 0.1);
+  --color-rule-soft: rgba(22, 34, 26, 0.06);
+  --color-alert: #a33a2e;
+  --font-sans: "Inter Tight", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
+  /* Square corners are the Garden signature. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-full: 9999px; /* keep this one — used for dots and spinners */
+}
+
 @layer base {
   html,
   body,
   #root {
     height: 100%;
   }
+  html {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--ink);
+  }
   body {
-    @apply bg-neutral-50 text-neutral-900 antialiased;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Mono kicker utility — used a lot. */
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mute);
+  }
+  /* Tabular numerics for mono counts/dates. */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 }
