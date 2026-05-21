@@ -45,8 +45,9 @@ const suggestionSchema = z.object({
           ),
         rationale: z
           .string()
+          .max(120)
           .describe(
-            "One sentence to show the user explaining why this bucket would help them.",
+            "ONE punchy phrase (max 12 words) explaining why. Examples: 'Triage prod alerts away from human messages.' or 'Group 40+ Loopsbot contact alerts.'",
           ),
         sampleEmailIds: z
           .array(z.string())
