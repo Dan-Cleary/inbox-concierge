@@ -68,17 +68,49 @@ export default function ChatSidebar({
     { initialNumItems: 50, stream: true },
   );
 
-  const uiMessages = useMemo(() => {
-    const all = toUIMessages(messagesQuery.results ?? []);
-    // Drop assistant messages that have no text (intermediate tool-call
-    // turns) — Agent surfaces those as separate messages while the model
-    // is calling tools.
-    return all.filter((m) => {
-      if (m.role !== "assistant") return true;
-      const text = textOf(m);
-      return text.trim().length > 0;
-    });
-  }, [messagesQuery.results]);
+  // Keep all messages including empty assistants so we can inspect their
+  // tool state for the bottom indicator. The render loop filters empty
+  // assistants out separately.
+  const allMessages = useMemo(
+    () => toUIMessages(messagesQuery.results ?? []),
+    [messagesQuery.results],
+  );
+
+  // Only render assistant bubbles once they have real text — avoids the
+  // empty-grey-bubble flash while a tool call is in flight.
+  const renderableMessages = useMemo(
+    () =>
+      allMessages.filter((m) => {
+        if (m.role !== "assistant") return true;
+        return textOf(m).trim().length > 0;
+      }),
+    [allMessages],
+  );
+
+  // Bottom "agent state" indicator — shown when the most recent message
+  // visible to the user is NOT a live streaming assistant with text.
+  // Replaces my earlier per-bubble dots + pills, which were strobing
+  // when an empty assistant turned into a streaming assistant.
+  const lastRendered = renderableMessages[renderableMessages.length - 1];
+  const lastIsLiveAssistant =
+    lastRendered?.role === "assistant" &&
+    "status" in lastRendered &&
+    lastRendered.status === "streaming";
+
+  const lastAll = allMessages[allMessages.length - 1];
+  const activeTool =
+    lastAll?.role === "assistant" && "status" in lastAll &&
+    lastAll.status === "streaming"
+      ? activeToolOf(lastAll)
+      : null;
+
+  // We show the indicator if:
+  // - a request is in flight, OR
+  // - an empty streaming assistant exists (still calling tools / about to emit)
+  const showIndicator =
+    (submitting || pending !== null || (lastAll?.role === "assistant" && "status" in lastAll && lastAll.status === "streaming" && textOf(lastAll).trim().length === 0)) &&
+    !lastIsLiveAssistant;
+  const uiMessages = renderableMessages;
 
   // Clear optimistic pending message once the server confirms.
   useEffect(() => {
@@ -189,7 +221,6 @@ export default function ChatSidebar({
                   role={m.role as "user" | "assistant"}
                   text={textOf(m)}
                   streaming={"status" in m && m.status === "streaming"}
-                  activeTool={activeToolOf(m)}
                   onCitationClick={onCitationClick}
                 />
               ))}
@@ -198,17 +229,9 @@ export default function ChatSidebar({
                   role="user"
                   text={pending}
                   streaming={false}
-                  activeTool={null}
                 />
               )}
-              {pending && uiMessages[uiMessages.length - 1]?.role !== "assistant" && (
-                <MessageBubble
-                  role="assistant"
-                  text=""
-                  streaming={true}
-                  activeTool={null}
-                />
-              )}
+              {showIndicator && <AgentIndicator tool={activeTool} />}
             </div>
           )}
         </div>
@@ -292,13 +315,11 @@ function MessageBubble({
   role,
   text,
   streaming,
-  activeTool,
   onCitationClick,
 }: {
   role: "user" | "assistant";
   text: string;
   streaming: boolean;
-  activeTool: string | null;
   onCitationClick?: (emailId: Id<"emails">) => void;
 }) {
   if (role === "user") {
@@ -311,45 +332,34 @@ function MessageBubble({
     );
   }
 
-  // Assistant — no bubble, plain text. Streaming caret while in flight.
-  const showToolPill = streaming && activeTool && text.length === 0;
-  const showDots = streaming && !activeTool && text.length === 0;
-
+  // Assistant rows only render once they have text (filter upstream).
+  // Blinking caret while still streaming.
   return (
     <div className="flex justify-start">
-      <div className="max-w-[95%] space-y-2">
-        <div className="text-[13px] leading-relaxed text-[var(--ink)]">
-          {showToolPill && <ToolPill tool={activeTool!} />}
-          {showDots && (
-            <span className="inline-flex items-center gap-1">
-              <Dot delay={0} />
-              <Dot delay={150} />
-              <Dot delay={300} />
-            </span>
-          )}
-          {text.length > 0 && (
-            <AssistantText text={text} onCitationClick={onCitationClick} />
-          )}
-          {streaming && text.length > 0 && (
-            <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-[var(--ink)] align-middle" />
-          )}
-        </div>
+      <div className="max-w-[95%] text-[13px] leading-relaxed text-[var(--ink)]">
+        <AssistantText text={text} onCitationClick={onCitationClick} />
+        {streaming && (
+          <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-[var(--ink)] align-middle" />
+        )}
       </div>
     </div>
   );
 }
 
-function ToolPill({ tool }: { tool: string }) {
-  const label = TOOL_LABELS[tool] ?? tool;
+// Bottom-of-list indicator. One source of truth for "the agent is doing
+// something but hasn't started talking yet." Replaces per-bubble dots and
+// pills that were strobing on rapid empty→tool→streaming transitions.
+function AgentIndicator({ tool }: { tool: string | null }) {
+  const label = tool ? TOOL_LABELS[tool] ?? tool : null;
   return (
-    <span className="inline-flex items-center gap-1.5 text-[var(--mute)]">
+    <div className="flex items-center gap-2 px-1 py-1 text-[var(--mute)]">
       <span className="inline-flex items-center gap-1">
         <Dot delay={0} />
         <Dot delay={150} />
         <Dot delay={300} />
       </span>
-      <span className="kicker">{label}</span>
-    </span>
+      {label && <span className="kicker">{label}</span>}
+    </div>
   );
 }
 
