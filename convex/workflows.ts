@@ -23,6 +23,7 @@ export const classifyInboxWorkflow = workflow.define({
     userId: v.id("users"),
     emailIds: v.array(v.id("emails")),
     modelId: v.string(),
+    runDiscovery: v.optional(v.boolean()),
   },
   handler: async (step, args): Promise<void> => {
     const batches: Id<"emails">[][] = [];
@@ -39,6 +40,14 @@ export const classifyInboxWorkflow = workflow.define({
           }),
         ),
       );
+    }
+    // After classification finishes, fire the discovery agent so the UI
+    // can surface bucket suggestions. Skip during reclassify (we don't want
+    // a feedback loop — discovery already saw this inbox last cycle).
+    if (args.runDiscovery) {
+      await step.runAction(internal.agents.discoverBuckets, {
+        userId: args.userId,
+      });
     }
   },
 });
@@ -74,6 +83,7 @@ export const startClassification = mutation({
         userId,
         emailIds,
         modelId: args.modelId ?? DEFAULT_MODEL,
+        runDiscovery: true,
       },
     );
     return { workflowId, count: emailIds.length };

@@ -37,13 +37,18 @@ export const classifyEmailBatch = internalAction({
     if (emails.length === 0) return { classified: 0, failed: 0 };
 
     const userId = emails[0].userId;
-    const buckets = (await ctx.runQuery(internal.inbox.getBuckets, {
-      userId,
-    })) as Array<{
-      _id: Id<"buckets">;
-      name: string;
-      description: string;
-    }>;
+    const [buckets, latestPrompt] = await Promise.all([
+      ctx.runQuery(internal.inbox.getBuckets, { userId }) as Promise<
+        Array<{
+          _id: Id<"buckets">;
+          name: string;
+          description: string;
+        }>
+      >,
+      ctx.runQuery(internal.promptVersions.latest, {}) as Promise<{
+        template: string;
+      } | null>,
+    ]);
 
     const bucketByName = new Map(buckets.map((b) => [b.name, b._id]));
     const cfg = getModel(args.modelId);
@@ -56,6 +61,7 @@ export const classifyEmailBatch = internalAction({
 
     const system = buildClassificationSystemPrompt(
       buckets.map((b) => ({ name: b.name, description: b.description })),
+      latestPrompt?.template,
     );
     const bucketNames = buckets.map((b) => b.name) as [string, ...string[]];
     const schema = z.object({

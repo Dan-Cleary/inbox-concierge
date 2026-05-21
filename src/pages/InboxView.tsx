@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import BucketCreator from "./BucketCreator";
+import BucketSuggestions from "./BucketSuggestions";
 
 type Bucket = Doc<"buckets">;
 type Email = Doc<"emails">;
@@ -54,11 +55,13 @@ export default function InboxView() {
     api.workflows.startReclassification,
   );
   const deleteBucket = useMutation(api.inbox.deleteBucket);
+  const triggerDiscovery = useAction(api.agents.triggerDiscovery);
   const { signOut } = useAuthActions();
 
   const [selected, setSelected] = useState<Selection>("all");
   const [syncing, setSyncing] = useState(false);
   const [reclassifying, setReclassifying] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -98,6 +101,18 @@ export default function InboxView() {
     }
   };
 
+  const handleDiscover = async () => {
+    setDiscovering(true);
+    setError(null);
+    try {
+      await triggerDiscovery({});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
   if (emails.length === 0) {
     return (
       <EmptyInboxState
@@ -133,6 +148,8 @@ export default function InboxView() {
       }}
       onReclassify={handleReclassify}
       reclassifying={reclassifying}
+      onDiscover={handleDiscover}
+      discovering={discovering}
       onSignOut={() => void signOut()}
       error={error}
     />
@@ -181,6 +198,7 @@ export default function InboxView() {
       )}
 
       <section className="flex-1 min-w-0">
+        <BucketSuggestions />
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-semibold text-neutral-900 sm:text-lg">
             {viewTitle(selected, buckets, emails.length, unclassifiedCount, bucketCounts)}
@@ -292,6 +310,8 @@ function Sidebar({
   onDeleteBucket,
   onReclassify,
   reclassifying,
+  onDiscover,
+  discovering,
   onSignOut,
   error,
 }: {
@@ -312,6 +332,8 @@ function Sidebar({
   onDeleteBucket: (b: Bucket) => void;
   onReclassify: () => void;
   reclassifying: boolean;
+  onDiscover: () => void;
+  discovering: boolean;
   onSignOut: () => void;
   error: string | null;
 }) {
@@ -353,14 +375,29 @@ function Sidebar({
 
       <BucketCreator />
 
-      <button
-        type="button"
-        onClick={onReclassify}
-        disabled={reclassifying || stats.classifying > 0 || stats.reclassifying > 0}
-        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-      >
-        {reclassifying ? "Triggering…" : "Reclassify all"}
-      </button>
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={onDiscover}
+          disabled={discovering || stats.classified < 30}
+          title={
+            stats.classified < 30
+              ? "Need at least 30 classified emails before suggesting"
+              : undefined
+          }
+          className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-50"
+        >
+          {discovering ? "Looking…" : "✨ Suggest more buckets"}
+        </button>
+        <button
+          type="button"
+          onClick={onReclassify}
+          disabled={reclassifying || stats.classifying > 0 || stats.reclassifying > 0}
+          className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {reclassifying ? "Triggering…" : "Reclassify all"}
+        </button>
+      </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 

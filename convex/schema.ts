@@ -134,6 +134,24 @@ export default defineSchema({
     latencyMs: v.number(),
   }).index("by_run", ["runId"]),
 
+  // Buckets the discovery Agent has proposed for a user. Status moves
+  // pending -> accepted | dismissed. Accepting creates a real bucket and
+  // triggers reclassification.
+  bucketSuggestions: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.string(),
+    rationale: v.string(),
+    sampleEmailIds: v.array(v.id("emails")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("dismissed"),
+    ),
+    createdAt: v.number(),
+    acceptedBucketId: v.optional(v.id("buckets")),
+  }).index("by_user_status", ["userId", "status"]),
+
   // Per-user settings (e.g. which model wins after eval).
   userSettings: defineTable({
     userId: v.id("users"),
