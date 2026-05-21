@@ -20,11 +20,13 @@ export default function PendingChangesBanner() {
       : `${pending.changeCount} label changes pending`;
 
   return (
-    <div className="mb-3 flex items-start justify-between gap-3 border border-[var(--ink)] bg-[var(--card-hi)] px-3 py-2.5">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border border-[var(--ink)] bg-[var(--card-hi)] px-3 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className="kicker text-[var(--moss)]">{label}</p>
-        <p className="mt-1 truncate text-[12px] text-[var(--ink)]">
-          {pending.summaries.join(" · ")}
+        <p className="text-[13px] text-[var(--ink)]">
+          <span className="kicker mr-2 text-[var(--moss)]">{label}</span>
+          <span className="text-[var(--mute)]">
+            {pending.summaries.join(" · ")}
+          </span>
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -39,7 +41,7 @@ export default function PendingChangesBanner() {
               setBusy(false);
             }
           }}
-          className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--mute)] hover:text-[var(--ink)] disabled:opacity-50"
+          className="text-[11px] text-[var(--mute)] hover:text-[var(--ink)] disabled:opacity-50"
         >
           Dismiss
         </button>
