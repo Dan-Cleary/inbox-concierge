@@ -1,9 +1,18 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useConfirm } from "../components/ConfirmDialog";
+
+// Friendly labels for tool calls — surfaced as "Searching inbox…" /
+// "Listing labels…" while the agent runs them.
+const TOOL_LABELS: Record<string, string> = {
+  searchInbox: "Searching inbox",
+  listLabels: "Reading your labels",
+};
 
 // Chat sidebar backed by the Convex Agent component. We don't run our
 // own message table — Agent owns thread + message persistence + token
@@ -180,14 +189,25 @@ export default function ChatSidebar({
                   role={m.role as "user" | "assistant"}
                   text={textOf(m)}
                   streaming={"status" in m && m.status === "streaming"}
+                  activeTool={activeToolOf(m)}
                   onCitationClick={onCitationClick}
                 />
               ))}
               {pending && (
-                <MessageBubble role="user" text={pending} streaming={false} />
+                <MessageBubble
+                  role="user"
+                  text={pending}
+                  streaming={false}
+                  activeTool={null}
+                />
               )}
-              {pending && (
-                <MessageBubble role="assistant" text="" streaming={true} />
+              {pending && uiMessages[uiMessages.length - 1]?.role !== "assistant" && (
+                <MessageBubble
+                  role="assistant"
+                  text=""
+                  streaming={true}
+                  activeTool={null}
+                />
               )}
             </div>
           )}
@@ -272,11 +292,13 @@ function MessageBubble({
   role,
   text,
   streaming,
+  activeTool,
   onCitationClick,
 }: {
   role: "user" | "assistant";
   text: string;
   streaming: boolean;
+  activeTool: string | null;
   onCitationClick?: (emailId: Id<"emails">) => void;
 }) {
   if (role === "user") {
@@ -289,18 +311,27 @@ function MessageBubble({
     );
   }
 
+  // Assistant — no bubble, plain text. Streaming caret while in flight.
+  const showToolPill = streaming && activeTool && text.length === 0;
+  const showDots = streaming && !activeTool && text.length === 0;
+
   return (
     <div className="flex justify-start">
       <div className="max-w-[95%] space-y-2">
         <div className="text-[13px] leading-relaxed text-[var(--ink)]">
-          {streaming && text.length === 0 ? (
+          {showToolPill && <ToolPill tool={activeTool!} />}
+          {showDots && (
             <span className="inline-flex items-center gap-1">
               <Dot delay={0} />
               <Dot delay={150} />
               <Dot delay={300} />
             </span>
-          ) : (
+          )}
+          {text.length > 0 && (
             <AssistantText text={text} onCitationClick={onCitationClick} />
+          )}
+          {streaming && text.length > 0 && (
+            <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-[var(--ink)] align-middle" />
           )}
         </div>
       </div>
@@ -308,9 +339,22 @@ function MessageBubble({
   );
 }
 
-// Parse [cid:emailId] markers out of the assistant's text, render the
-// surrounding prose as-is and the markers as superscript chips that jump
-// to the email row when clicked.
+function ToolPill({ tool }: { tool: string }) {
+  const label = TOOL_LABELS[tool] ?? tool;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[var(--mute)]">
+      <span className="inline-flex items-center gap-1">
+        <Dot delay={0} />
+        <Dot delay={150} />
+        <Dot delay={300} />
+      </span>
+      <span className="kicker">{label}</span>
+    </span>
+  );
+}
+
+// Renders assistant text as markdown, with [cid:emailId] markers
+// extracted and replaced inline with numbered citation chips.
 function AssistantText({
   text,
   onCitationClick,
@@ -318,48 +362,125 @@ function AssistantText({
   text: string;
   onCitationClick?: (emailId: Id<"emails">) => void;
 }) {
-  const re = /\[cid:([a-z0-9]+)\]/gi;
-  const parts: React.ReactNode[] = [];
+  // First pass: extract citations, replace each [cid:X] with a unique
+  // placeholder token (CITE-N) that markdown won't touch. We re-substitute
+  // after markdown renders.
   const handleToIndex = new Map<string, number>();
-  let last = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-  while ((match = re.exec(text)) !== null) {
-    const cid = match[1];
-    if (match.index > last) {
-      parts.push(text.slice(last, match.index));
-    }
+  const replaced = text.replace(/\[cid:([a-z0-9]+)\]/gi, (_, cid: string) => {
     let idx = handleToIndex.get(cid);
     if (idx === undefined) {
       idx = handleToIndex.size + 1;
       handleToIndex.set(cid, idx);
     }
-    parts.push(
-      <button
-        key={key++}
-        type="button"
-        onClick={() => onCitationClick?.(cid as Id<"emails">)}
-        className="mx-0.5 inline-flex h-4 min-w-4 items-center justify-center bg-[var(--moss)] px-1 text-[10px] font-bold text-white hover:bg-[var(--ink)]"
-        title="Jump to email"
+    return `{{CITE-${idx}-${cid}}}`;
+  });
+
+  const renderChild = (children: React.ReactNode): React.ReactNode => {
+    if (typeof children === "string") return splitCitations(children);
+    if (Array.isArray(children)) return children.map(renderChild);
+    return children;
+  };
+
+  const splitCitations = (s: string): React.ReactNode => {
+    const re = /\{\{CITE-(\d+)-([a-z0-9]+)\}\}/gi;
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    let key = 0;
+    while ((m = re.exec(s)) !== null) {
+      if (m.index > last) out.push(s.slice(last, m.index));
+      const idx = m[1];
+      const cid = m[2];
+      out.push(
+        <button
+          key={key++}
+          type="button"
+          onClick={() => onCitationClick?.(cid as Id<"emails">)}
+          className="mx-0.5 inline-flex h-4 min-w-4 items-center justify-center bg-[var(--moss)] px-1 text-[10px] font-bold text-white hover:bg-[var(--ink)]"
+          title="Jump to email"
+        >
+          {idx}
+        </button>,
+      );
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) out.push(s.slice(last));
+    return out;
+  };
+
+  return (
+    <div className="prose-chat">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => (
+            <p className="my-1 leading-relaxed">{renderChild(children)}</p>
+          ),
+          ul: ({ children }) => (
+            <ul className="my-1.5 list-disc space-y-0.5 pl-5">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="my-1.5 list-decimal space-y-0.5 pl-5">{children}</ol>
+          ),
+          li: ({ children }) => <li>{renderChild(children)}</li>,
+          strong: ({ children }) => (
+            <strong className="font-semibold">{renderChild(children)}</strong>
+          ),
+          em: ({ children }) => <em>{renderChild(children)}</em>,
+          code: ({ children }) => (
+            <code className="bg-[var(--card)] px-1 py-px text-[12px] font-mono">
+              {children}
+            </code>
+          ),
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--moss)] underline"
+            >
+              {renderChild(children)}
+            </a>
+          ),
+        }}
       >
-        {idx}
-      </button>,
-    );
-    last = match.index + match[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return <span className="whitespace-pre-wrap">{parts}</span>;
+        {replaced}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 // Extract concatenated text from a UIMessage's parts array.
+type Part = {
+  type: string;
+  text?: string;
+  state?: string;
+  toolName?: string;
+};
 type UIMessageLike = {
-  parts?: Array<{ type: string; text?: string }>;
+  parts?: Part[];
 };
 function textOf(m: UIMessageLike): string {
   return (m.parts ?? [])
     .filter((p) => p.type === "text" && typeof p.text === "string")
     .map((p) => p.text!)
     .join("");
+}
+
+// Find the currently-active tool call on a message, if any. Tool parts
+// in ai-sdk v6 are typed as `tool-${name}`; we surface the name so the
+// UI can show "Searching inbox…" while the call is in flight.
+function activeToolOf(m: UIMessageLike): string | null {
+  const parts = m.parts ?? [];
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    if (typeof p.type !== "string") continue;
+    if (!p.type.startsWith("tool-")) continue;
+    // Skip completed tool parts — we only want in-flight ones.
+    if (p.state === "output-available" || p.state === "error") continue;
+    return p.type.slice("tool-".length);
+  }
+  return null;
 }
 
 function Dot({ delay }: { delay: number }) {

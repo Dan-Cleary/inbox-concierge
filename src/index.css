@@ -88,4 +88,11 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
+  /* Compact markdown inside chat messages. */
+  .prose-chat > * + * {
+    margin-top: 0.4rem;
+  }
+  .prose-chat > :first-child {
+    margin-top: 0;
+  }
 }
