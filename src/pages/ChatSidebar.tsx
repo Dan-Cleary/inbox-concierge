@@ -1,8 +1,14 @@
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useEffect, useRef, useState } from "react";
+import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useConfirm } from "../components/ConfirmDialog";
+
+// Chat sidebar backed by the Convex Agent component. We don't run our
+// own message table — Agent owns thread + message persistence + token
+// streaming. UI uses useThreadMessages (subscribes to the thread + merges
+// stream deltas) and toUIMessages (flattens Agent's message graph).
 
 export default function ChatSidebar({
   open,
@@ -13,23 +19,79 @@ export default function ChatSidebar({
   onClose: () => void;
   onCitationClick?: (emailId: Id<"emails">) => void;
 }) {
-  const messages = useQuery(api.chatDb.listMessages);
   const me = useQuery(api.inbox.currentUser);
-  const ask = useAction(api.chat.askInbox);
-  const clearChat = useMutation(api.chatDb.clearChat);
-  const [input, setInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const getOrCreateChat = useAction(api.chats.getOrCreateChat);
+  const sendMessage = useAction(api.chats.sendMessage);
+  const clearChat = useMutation(api.chats.clearChat);
   const { confirm, dialog } = useConfirm();
 
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Optimistic user message shown immediately on submit; cleared once
+  // the server stream surfaces the same text.
+  const [pending, setPending] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Lazily create the thread when the sidebar first opens.
+  useEffect(() => {
+    if (!open || threadId) return;
+    let cancelled = false;
+    getOrCreateChat({})
+      .then((r) => {
+        if (!cancelled) setThreadId(r.threadId);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, threadId, getOrCreateChat]);
+
+  const messagesQuery = useThreadMessages(
+    api.chats.listThreadMessages,
+    threadId ? { threadId } : "skip",
+    { initialNumItems: 50, stream: true },
+  );
+
+  const uiMessages = useMemo(() => {
+    const all = toUIMessages(messagesQuery.results ?? []);
+    // Drop assistant messages that have no text (intermediate tool-call
+    // turns) — Agent surfaces those as separate messages while the model
+    // is calling tools.
+    return all.filter((m) => {
+      if (m.role !== "assistant") return true;
+      const text = textOf(m);
+      return text.trim().length > 0;
+    });
+  }, [messagesQuery.results]);
+
+  // Clear optimistic pending message once the server confirms.
+  useEffect(() => {
+    if (!pending) return;
+    const seen = uiMessages.some(
+      (m) => m.role === "user" && textOf(m) === pending,
+    );
+    if (seen) setPending(null);
+  }, [uiMessages, pending]);
+
+  // Auto-scroll on new content.
   useEffect(() => {
     if (!open || !scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, open]);
+  }, [
+    uiMessages.length,
+    uiMessages[uiMessages.length - 1]?.parts?.length,
+    pending,
+    open,
+  ]);
 
-  // Autosize the textarea up to a max so multi-line questions feel natural.
+  // Autosize textarea.
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -39,28 +101,30 @@ export default function ChatSidebar({
 
   if (!open) return null;
 
+  const empty = uiMessages.length === 0 && !pending;
+  const firstName = (me?.name ?? "").trim().split(/\s+/)[0] || "there";
+
   const submit = async () => {
-    const q = input.trim();
-    if (!q || submitting) return;
+    const prompt = input.trim();
+    if (!prompt || submitting || !threadId) return;
     setInput("");
+    setPending(prompt);
     setSubmitting(true);
     setError(null);
     try {
-      await ask({ question: q });
+      await sendMessage({ threadId, prompt });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setPending(null);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const empty = !messages || messages.length === 0;
-  const firstName = (me?.name ?? "").trim().split(/\s+/)[0] || "there";
-
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/20 lg:hidden"
+        className="fixed inset-0 z-40 bg-[rgba(22,34,26,0.2)] lg:hidden"
         onClick={onClose}
       />
       <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-[var(--ink)] bg-[var(--bg)]">
@@ -73,13 +137,17 @@ export default function ChatSidebar({
                 onClick={async () => {
                   const ok = await confirm({
                     title: "Clear chat history?",
+                    message:
+                      "Starts a new thread. Old messages stay in Convex but aren't shown anymore.",
                     confirmLabel: "Clear",
                     variant: "danger",
                   });
-                  if (ok) clearChat();
+                  if (!ok) return;
+                  await clearChat();
+                  setThreadId(null);
+                  setPending(null);
                 }}
                 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--mute)] hover:text-[var(--ink)]"
-                aria-label="Clear chat"
               >
                 Clear
               </button>
@@ -95,10 +163,7 @@ export default function ChatSidebar({
           </div>
         </header>
 
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto px-5 pb-3"
-        >
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 pb-3">
           {empty ? (
             <EmptyState
               firstName={firstName}
@@ -109,13 +174,21 @@ export default function ChatSidebar({
             />
           ) : (
             <div className="space-y-4 pt-2">
-              {messages.map((m) => (
+              {uiMessages.map((m) => (
                 <MessageBubble
-                  key={m._id}
-                  message={m}
+                  key={m.key}
+                  role={m.role as "user" | "assistant"}
+                  text={textOf(m)}
+                  streaming={"status" in m && m.status === "streaming"}
                   onCitationClick={onCitationClick}
                 />
               ))}
+              {pending && (
+                <MessageBubble role="user" text={pending} streaming={false} />
+              )}
+              {pending && (
+                <MessageBubble role="assistant" text="" streaming={true} />
+              )}
             </div>
           )}
         </div>
@@ -137,14 +210,14 @@ export default function ChatSidebar({
               }}
               placeholder="Ask your inbox"
               rows={1}
-              disabled={submitting}
+              disabled={submitting || !threadId}
               className="block w-full resize-none border-0 bg-transparent px-3 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-[var(--mute-dim)] focus:outline-none"
             />
             <div className="flex items-center justify-end gap-1 border-t border-[var(--rule-soft)] px-2 py-1.5">
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={!input.trim() || submitting}
+                disabled={!input.trim() || submitting || !threadId}
                 className="inline-flex h-7 w-7 items-center justify-center bg-[var(--ink)] text-[var(--bg)] transition-opacity hover:bg-[var(--ink-soft)] disabled:bg-[var(--rule)] disabled:text-[var(--mute-dim)]"
                 aria-label="Send"
               >
@@ -161,8 +234,8 @@ export default function ChatSidebar({
 
 const SUGGESTIONS: Array<{ icon: React.ReactNode; label: string }> = [
   { icon: <SearchIcon />, label: "What's most important in my inbox right now?" },
-  { icon: <MailIcon />, label: "Show me anything from Sentry this week." },
-  { icon: <SparkleIcon />, label: "Are there any cold sales emails I can ignore?" },
+  { icon: <MailIcon />, label: "Anything from Sentry this week?" },
+  { icon: <SparkleIcon />, label: "Are there cold sales emails I can ignore?" },
   { icon: <ClockIcon />, label: "What needs a reply today?" },
 ];
 
@@ -195,31 +268,22 @@ function EmptyState({
   );
 }
 
-type Message = {
-  _id: Id<"chatMessages">;
-  role: "user" | "assistant";
-  content: string;
-  pending?: boolean;
-  error?: string;
-  citations?: Array<{
-    _id: Id<"emails">;
-    subject: string;
-    from: string;
-  }>;
-};
-
 function MessageBubble({
-  message,
+  role,
+  text,
+  streaming,
   onCitationClick,
 }: {
-  message: Message;
+  role: "user" | "assistant";
+  text: string;
+  streaming: boolean;
   onCitationClick?: (emailId: Id<"emails">) => void;
 }) {
-  if (message.role === "user") {
+  if (role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-neutral-900 px-3 py-2 text-sm text-white">
-          {message.content}
+        <div className="max-w-[85%] whitespace-pre-wrap border border-[var(--ink)] bg-[var(--ink)] px-3 py-2 text-[13px] text-[var(--bg)]">
+          {text}
         </div>
       </div>
     );
@@ -228,81 +292,74 @@ function MessageBubble({
   return (
     <div className="flex justify-start">
       <div className="max-w-[95%] space-y-2">
-        <div className="text-sm leading-relaxed text-neutral-900">
-          {message.pending ? (
+        <div className="text-[13px] leading-relaxed text-[var(--ink)]">
+          {streaming && text.length === 0 ? (
             <span className="inline-flex items-center gap-1">
               <Dot delay={0} />
               <Dot delay={150} />
               <Dot delay={300} />
             </span>
           ) : (
-            renderWithCitations(
-              message.content,
-              message.citations ?? [],
-              onCitationClick,
-            )
+            <AssistantText text={text} onCitationClick={onCitationClick} />
           )}
         </div>
-        {!message.pending &&
-          message.citations &&
-          message.citations.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {message.citations.map((c) => (
-                <button
-                  key={c._id}
-                  type="button"
-                  onClick={() => onCitationClick?.(c._id)}
-                  className="max-w-full truncate rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700 transition-colors hover:border-neutral-400 hover:bg-neutral-50"
-                  title={`${c.from} — ${c.subject}`}
-                >
-                  <span className="font-medium">{extractName(c.from)}:</span>{" "}
-                  {c.subject}
-                </button>
-              ))}
-            </div>
-          )}
       </div>
     </div>
   );
 }
 
-function renderWithCitations(
-  content: string,
-  citations: Array<{ _id: Id<"emails"> }>,
-  onCitationClick?: (emailId: Id<"emails">) => void,
-): React.ReactNode {
-  const indexById = new Map<string, number>();
-  citations.forEach((c, i) => indexById.set(c._id, i + 1));
+// Parse [cid:emailId] markers out of the assistant's text, render the
+// surrounding prose as-is and the markers as superscript chips that jump
+// to the email row when clicked.
+function AssistantText({
+  text,
+  onCitationClick,
+}: {
+  text: string;
+  onCitationClick?: (emailId: Id<"emails">) => void;
+}) {
+  const re = /\[cid:([a-z0-9]+)\]/gi;
   const parts: React.ReactNode[] = [];
+  const handleToIndex = new Map<string, number>();
   let last = 0;
-  const re = /\[([a-z0-9]{8,})\]/gi;
-  let m: RegExpExecArray | null;
+  let match: RegExpExecArray | null;
   let key = 0;
-  while ((m = re.exec(content)) !== null) {
-    const id = m[1];
-    const n = indexById.get(id);
-    if (n === undefined) continue;
-    parts.push(content.slice(last, m.index));
+  while ((match = re.exec(text)) !== null) {
+    const cid = match[1];
+    if (match.index > last) {
+      parts.push(text.slice(last, match.index));
+    }
+    let idx = handleToIndex.get(cid);
+    if (idx === undefined) {
+      idx = handleToIndex.size + 1;
+      handleToIndex.set(cid, idx);
+    }
     parts.push(
       <button
         key={key++}
         type="button"
-        onClick={() => onCitationClick?.(id as Id<"emails">)}
+        onClick={() => onCitationClick?.(cid as Id<"emails">)}
         className="mx-0.5 inline-flex h-4 min-w-4 items-center justify-center bg-[var(--moss)] px-1 text-[10px] font-bold text-white hover:bg-[var(--ink)]"
         title="Jump to email"
       >
-        {n}
+        {idx}
       </button>,
     );
-    last = m.index + m[0].length;
+    last = match.index + match[0].length;
   }
-  parts.push(content.slice(last));
-  return <>{parts}</>;
+  if (last < text.length) parts.push(text.slice(last));
+  return <span className="whitespace-pre-wrap">{parts}</span>;
 }
 
-function extractName(from: string): string {
-  const match = from.match(/^"?([^"<]+?)"?\s*<.+>$/);
-  return match?.[1]?.trim() ?? from;
+// Extract concatenated text from a UIMessage's parts array.
+type UIMessageLike = {
+  parts?: Array<{ type: string; text?: string }>;
+};
+function textOf(m: UIMessageLike): string {
+  return (m.parts ?? [])
+    .filter((p) => p.type === "text" && typeof p.text === "string")
+    .map((p) => p.text!)
+    .join("");
 }
 
 function Dot({ delay }: { delay: number }) {

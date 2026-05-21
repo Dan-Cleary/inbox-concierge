@@ -306,6 +306,32 @@ export const getEmailsByIdPreservingOrder = internalQuery({
   },
 });
 
+export const labelsWithCountsFor = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const [buckets, emails] = await Promise.all([
+      ctx.db
+        .query("buckets")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+      ctx.db
+        .query("emails")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+    ]);
+    const counts = new Map<string, number>();
+    for (const e of emails) {
+      if (!e.bucketId) continue;
+      counts.set(e.bucketId, (counts.get(e.bucketId) ?? 0) + 1);
+    }
+    return buckets.map((b) => ({
+      name: b.name,
+      description: b.description,
+      count: counts.get(b._id) ?? 0,
+    }));
+  },
+});
+
 export const getBuckets = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

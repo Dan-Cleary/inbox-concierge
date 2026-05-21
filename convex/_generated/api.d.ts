@@ -11,8 +11,7 @@
 import type * as agents from "../agents.js";
 import type * as agentsDb from "../agentsDb.js";
 import type * as auth from "../auth.js";
-import type * as chat from "../chat.js";
-import type * as chatDb from "../chatDb.js";
+import type * as chats from "../chats.js";
 import type * as classify from "../classify.js";
 import type * as classifyAction from "../classifyAction.js";
 import type * as evalRunner from "../evalRunner.js";
@@ -21,6 +20,7 @@ import type * as evalsDb from "../evalsDb.js";
 import type * as gmail from "../gmail.js";
 import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
+import type * as inboxAgent from "../inboxAgent.js";
 import type * as labelChanges from "../labelChanges.js";
 import type * as models from "../models.js";
 import type * as promptVersions from "../promptVersions.js";
@@ -38,8 +38,7 @@ declare const fullApi: ApiFromModules<{
   agents: typeof agents;
   agentsDb: typeof agentsDb;
   auth: typeof auth;
-  chat: typeof chat;
-  chatDb: typeof chatDb;
+  chats: typeof chats;
   classify: typeof classify;
   classifyAction: typeof classifyAction;
   evalRunner: typeof evalRunner;
@@ -48,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   gmail: typeof gmail;
   http: typeof http;
   inbox: typeof inbox;
+  inboxAgent: typeof inboxAgent;
   labelChanges: typeof labelChanges;
   models: typeof models;
   promptVersions: typeof promptVersions;
