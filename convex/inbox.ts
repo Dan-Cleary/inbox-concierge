@@ -108,11 +108,14 @@ export const listEmails = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    return ctx.db
+    const emails = await ctx.db
       .query("emails")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
       .collect();
+    // Sort by Gmail date (newest first) so the inbox feels like an inbox.
+    // Convex's `.order("desc")` would sort by _creationTime which is the
+    // sync-insert time, not the email's actual sent/received date.
+    return emails.sort((a, b) => b.date - a.date);
   },
 });
 

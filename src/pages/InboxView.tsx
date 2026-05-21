@@ -509,9 +509,20 @@ function EmailList({
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
-              <StatusPill status={e.classifyStatus} />
-              {e.bucketId && bucketById.has(e.bucketId) && (
-                <BucketPill bucket={bucketById.get(e.bucketId)!} />
+              {/* During a re-classify, keep the prior bucket visible (dimmed)
+                  so the list doesn't flash empty across all 200 rows.
+                  The global stats card already shows progress. */}
+              {e.classifyStatus === "re-classifying" &&
+              e.bucketId &&
+              bucketById.has(e.bucketId) ? (
+                <BucketPill bucket={bucketById.get(e.bucketId)!} dim />
+              ) : (
+                <>
+                  <StatusPill status={e.classifyStatus} />
+                  {e.bucketId && bucketById.has(e.bucketId) && (
+                    <BucketPill bucket={bucketById.get(e.bucketId)!} />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -536,10 +547,12 @@ function StatusPill({ status }: { status: Email["classifyStatus"] }) {
   );
 }
 
-function BucketPill({ bucket }: { bucket: Bucket }) {
+function BucketPill({ bucket, dim }: { bucket: Bucket; dim?: boolean }) {
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${bucketPillFor(bucket)}`}
+      className={`relative rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset transition-opacity ${bucketPillFor(bucket)} ${
+        dim ? "animate-pulse opacity-50" : ""
+      }`}
     >
       {bucket.name}
     </span>
