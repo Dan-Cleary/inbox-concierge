@@ -443,24 +443,30 @@ function LabelRow({
           {label}
         </span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center">
         <span className="num text-[11px] text-[var(--mute)] tabular-nums">
           {count}
         </span>
-        {onDelete && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="text-[11px] text-[var(--mute-dim)] opacity-0 transition-opacity hover:text-[var(--alert)] group-hover:opacity-100"
-            title="Delete label"
-            aria-label={`Delete ${label}`}
-          >
-            ×
-          </button>
-        )}
+        {/* Always reserve the × slot — even on default rows — so count
+            stays right-aligned across every row. Default rows render an
+            empty spacer of the same width; custom rows render the × that
+            fades in on hover. */}
+        <span className="ml-2 inline-flex w-3 justify-center">
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="text-[12px] leading-none text-[var(--mute-dim)] opacity-0 transition-opacity hover:text-[var(--alert)] group-hover:opacity-100"
+              title="Delete label"
+              aria-label={`Delete ${label}`}
+            >
+              ×
+            </button>
+          )}
+        </span>
       </div>
     </li>
   );
