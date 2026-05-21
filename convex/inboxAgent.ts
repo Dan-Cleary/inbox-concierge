@@ -21,6 +21,7 @@ const searchInbox = createTool({
     query: z.string().describe("Natural-language search query."),
     limit: z.number().optional().describe("Max results, default 8."),
   }),
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   execute: async (ctx: any, input: { query: string; limit?: number }) => {
     const userId = ctx.userId as Id<"users"> | undefined;
@@ -36,6 +37,7 @@ const searchInbox = createTool({
     const emailIds = results
       .map((r) => {
         const e = entryById.get(r.entryId);
+        
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return ((e as any)?.key ?? r.entryId) as Id<"emails">;
       })
@@ -56,6 +58,7 @@ const searchInbox = createTool({
       results: results
         .map((r, i) => {
           const e = entryById.get(r.entryId);
+          
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const emailId = String((e as any)?.key ?? r.entryId);
           const full = byId.get(emailId);
@@ -93,11 +96,9 @@ const listEmails = createTool({
       .optional()
       .describe("Max results, default 10."),
   }),
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  execute: async (
-    ctx: any,
-    input: { label?: string; limit?: number },
-  ) => {
+  execute: async (ctx: any, input: { label?: string; limit?: number }) => {
     const userId = ctx.userId as Id<"users"> | undefined;
     if (!userId) return { results: [] };
     const results = (await ctx.runQuery(
@@ -126,6 +127,7 @@ const listLabels = createTool({
   description:
     "List every label the user has, with email counts. Use this when the user asks about counts, label coverage, or 'what labels do I have'.",
   inputSchema: z.object({}),
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   execute: async (ctx: any) => {
     const userId = ctx.userId as Id<"users"> | undefined;
@@ -159,6 +161,7 @@ const createLabel = createTool({
         "Plain-English criterion the classifier will use. Be specific about senders, topics, or workflows.",
       ),
   }),
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   execute: async (ctx: any, input: { name: string; description: string }) => {
     const userId = ctx.userId as Id<"users"> | undefined;
@@ -187,6 +190,7 @@ const deleteLabel = createTool({
   inputSchema: z.object({
     name: z.string().describe("Exact name of the label to delete."),
   }),
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   execute: async (ctx: any, input: { name: string }) => {
     const userId = ctx.userId as Id<"users"> | undefined;
@@ -214,6 +218,7 @@ const runReclassify = createTool({
   description:
     "Apply pending label changes and re-sort the user's entire inbox against the current label set. This is the same as the user clicking 'Apply & re-sort' in the inbox banner. Use when the user asks to apply changes, re-sort, re-classify, or 'apply now'. Takes ~40 seconds; tell the user it's running in the background and the inbox will update live.",
   inputSchema: z.object({}),
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   execute: async (ctx: any) => {
     const userId = ctx.userId as Id<"users"> | undefined;

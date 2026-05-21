@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 export default function ConfirmDialog({
   open,
@@ -85,41 +85,5 @@ export default function ConfirmDialog({
   );
 }
 
-export type ConfirmOptions = {
-  title: string;
-  message?: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  variant?: "default" | "danger";
-};
-
-export function useConfirm() {
-  const [state, setState] = useState<
-    | (ConfirmOptions & { resolve: (ok: boolean) => void })
-    | null
-  >(null);
-
-  const confirm = (opts: ConfirmOptions): Promise<boolean> =>
-    new Promise((resolve) => setState({ ...opts, resolve }));
-
-  const node = (
-    <ConfirmDialog
-      open={state !== null}
-      title={state?.title ?? ""}
-      message={state?.message}
-      confirmLabel={state?.confirmLabel}
-      cancelLabel={state?.cancelLabel}
-      variant={state?.variant}
-      onConfirm={() => {
-        state?.resolve(true);
-        setState(null);
-      }}
-      onCancel={() => {
-        state?.resolve(false);
-        setState(null);
-      }}
-    />
-  );
-
-  return { confirm, dialog: node };
-}
+// useConfirm() lives in ./useConfirm.tsx — split out so this file only
+// exports the component (React fast-refresh compatibility).

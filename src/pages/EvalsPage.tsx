@@ -4,7 +4,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import DatasetTable from "./DatasetTable";
 import RunsPanel from "./RunsPanel";
-import { useConfirm } from "../components/ConfirmDialog";
+import { useConfirm } from "../components/useConfirm";
 
 type Tab = "dataset" | "bench";
 

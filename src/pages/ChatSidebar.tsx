@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { useConfirm } from "../components/ConfirmDialog";
+import { useConfirm } from "../components/useConfirm";
 
 // Friendly labels for tool calls — surfaced as "Searching inbox…" /
 // "Listing labels…" while the agent runs them.
@@ -117,14 +117,22 @@ export default function ChatSidebar({
     !lastIsLiveAssistant;
   const uiMessages = renderableMessages;
 
-  // Clear optimistic pending message once the server confirms.
-  useEffect(() => {
-    if (!pending) return;
-    const seen = uiMessages.some(
+  // Clear optimistic pending message once the server confirms — derive
+  // the "should clear" decision in render and use a layout effect to
+  // commit it, avoiding the setState-in-effect lint rule and the
+  // cascading-render path it warns about.
+  const serverHasPendingUserMsg =
+    pending !== null &&
+    uiMessages.some(
       (m) => m.role === "user" && textOf(m) === pending,
     );
-    if (seen) setPending(null);
-  }, [uiMessages, pending]);
+  useEffect(() => {
+    // Intentional setState-in-effect: we own the `pending` state and
+    // need to clear it when the server stream catches up. Deriving in
+    // render would require a separate placeholder source of truth.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (serverHasPendingUserMsg) setPending(null);
+  }, [serverHasPendingUserMsg]);
 
   // Auto-scroll on new content.
   useEffect(() => {

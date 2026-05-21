@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { CreateLabelButton } from "./BucketCreator";
-import { useConfirm } from "../components/ConfirmDialog";
+import { useConfirm } from "../components/useConfirm";
 import BucketSuggestions from "./BucketSuggestions";
 import ChatSidebar from "./ChatSidebar";
 import PendingChangesBanner from "./PendingChangesBanner";
