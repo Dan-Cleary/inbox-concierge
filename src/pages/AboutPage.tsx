@@ -43,7 +43,7 @@ export default function AboutPage() {
               label: "AI-native speed",
               body: "Used AI as a force multiplier — verified, not vibes.",
               evidence: [
-                "Built end-to-end in ~3 days with Claude Code + gstack skills",
+                "Built end-to-end in ~2 days, part-time, with Claude Code + gstack skills",
                 "Every LLM-classified email is shown to the user with its bucket — drift is visible, not hidden",
                 "Multi-model eval harness (8 models, real dataset) ships in the app, not a notebook",
               ],
@@ -59,6 +59,133 @@ export default function AboutPage() {
             },
           ]}
         />
+      </Section>
+
+      <Section
+        kicker="LLM usage"
+        title="Where AI shows up in the product."
+        body="Three distinct LLM surfaces, each picked for what it actually needs."
+      >
+        <div className="space-y-4">
+          <UsageRow
+            surface="Classification"
+            lib="AI SDK · generateObject() with a Zod schema"
+            body="One-shot, structured output, no tool calls, no streaming. Send a batch of 10 emails, get back 10 {bucketName, confidence} pairs. The Agent component would be ceremony here — generateObject is exactly the right primitive."
+          />
+          <UsageRow
+            surface="Dataset generation (evals)"
+            lib="AI SDK · generateObject() with GPT-5.5"
+            body="Same shape as classification: ask a strong model to label a sample so we have a locked dataset to benchmark cheaper models against. One call, structured output."
+          />
+          <UsageRow
+            surface="Chat with inbox"
+            lib="Convex Agent component (wraps AI SDK)"
+            body="Multi-turn, tool calls, streamed deltas, persisted threads. The Agent component gives me thread storage, syncStreams for the React hook, tool-call retries, and step bounds out of the box. Reimplementing that on raw ai-sdk would re-build the same thing worse."
+          />
+          <UsageRow
+            surface="Bucket discovery"
+            lib="Convex Agent · generateObject()"
+            body="One-shot structured output, but I used the Agent variant so the call inherits the same model config and observability as chat. The Agent component supports both shapes."
+          />
+        </div>
+        <p className="mt-4 text-[12px] text-[var(--mute)]">
+          Provider routing goes through Anthropic, OpenAI, and Google directly via their AI SDK packages. Models tested: Sonnet 4.6, Haiku 4.5, Opus 4.7, GPT-5.5/mini/nano, Gemini 3.5 Flash.
+        </p>
+      </Section>
+
+      <Section
+        kicker="Agent tools"
+        title="What chat can actually do."
+        body="The chat agent has six tools. Each is scoped to the signed-in user's data via ctx.userId — no cross-tenant access."
+      >
+        <div className="grid gap-2">
+          <ToolRow
+            name="searchInbox"
+            body="RAG search over the user's email corpus. Returns hits with citation handles the UI renders as chips."
+          />
+          <ToolRow
+            name="listEmails"
+            body="Date-ordered listing with optional label filter. Added after the agent hallucinated 'the latest important email' from RAG snippets — this gives it a deterministic path for 'most recent X'."
+          />
+          <ToolRow
+            name="listLabels"
+            body="Returns all of the user's labels with current email counts. The agent uses this to ground references like 'the From investors one'."
+          />
+          <ToolRow
+            name="createLabel"
+            body="Creates a new label. Enforces the same MAX_LABELS=12 cap and dupe check as the UI button. Queues a pending change."
+          />
+          <ToolRow
+            name="deleteLabel"
+            body="Deletes a custom label and unassigns its emails. Refuses to delete the four default labels (Important / Can wait / Newsletter / Auto-archive)."
+          />
+          <ToolRow
+            name="runReclassify"
+            body="Kicks off the classification workflow over the user's 200 emails and clears the pending-changes banner. Saves the user a trip to the Apply button."
+          />
+        </div>
+      </Section>
+
+      <Section
+        kicker="Architecture decisions"
+        title="The non-obvious calls."
+        body=""
+      >
+        <div className="space-y-5">
+          <Decision
+            title="Convex as the whole backend"
+            body="Sync engine + Agent + RAG + Workflow as one platform means I write zero glue: queries are reactive in React without a state library, the agent's tools are just Convex mutations, RAG is a component with per-user namespacing, and the classification pipeline is a durable workflow that survives action timeouts. The alternative (Next.js API routes + Postgres + a queue + a separate vector DB + WebSocket layer) would have eaten the whole 2 days on plumbing."
+          />
+          <Decision
+            title="Pending-changes accumulator instead of debounce"
+            body="My first cut debounced reclassification 1.5s after a label edit. That breaks the moment label creation takes 30–60s (modal + LLM-generated description), so every keystroke would race the timer. Replaced with an explicit 'Apply & re-sort' banner that accumulates label changes and runs reclassify once on commit. Same number of clicks, predictable behavior."
+          />
+          <Decision
+            title="Per-user RAG namespacing"
+            body="The RAG component is namespaced by `user:${userId}`. Embeddings are isolated per inbox so a chat query can't accidentally retrieve another user's content even if the userId filter on the action were ever wrong. Defense in depth."
+          />
+          <Decision
+            title="Reviewer-link auth path"
+            body="Google OAuth in Testing mode blocks anyone not added as a test user, which would have meant collecting reviewer emails before the demo. Built a ConvexCredentials provider keyed on a shared secret in the URL that signs in as a designated demo user. The reviewer hits a link and lands in a fully-populated inbox — no coordination needed."
+          />
+          <Decision
+            title="Locked eval dataset, not synthetic on every run"
+            body="The eval harness pins one GPT-5.5-generated dataset and benchmarks every other model against it. Without pinning, you can't compare runs across time — the dataset is the y-axis. Cost-vs-accuracy scatter only means something when the x-axis is fixed."
+          />
+        </div>
+      </Section>
+
+      <Section
+        kicker="Trade-offs"
+        title="What I cut, and what I'd do next."
+        body=""
+      >
+        <div className="space-y-5">
+          <Decision
+            title="Cut: write actions on Gmail (archive, label, reply)"
+            body="The spec is read-only, and write actions widen the OAuth scope, the consent screen, and the blast radius of a bug. The agent's tools mutate Convex state only. If this shipped for real, the next step is a 'sync labels back to Gmail' opt-in — but verify-the-classification UX first, then write."
+          />
+          <Decision
+            title="Cut: multi-account / shared inbox"
+            body="One Google account per Convex user. Multi-account would mean credentials as a list, a per-account picker in the UI, and a cross-account dedup story. Out of scope for a 2-day build, and a real product decision (do you merge inboxes or keep them separate?) not just engineering."
+          />
+          <Decision
+            title="Cut: per-bucket prompt overrides"
+            body="The classifier prompt is one global system prompt. A real version would let power users tweak the description of 'Important' for their domain (e.g. a fundraiser vs. a recruiter) and re-eval against the dataset. The eval harness is the half I built; the per-user override is the half I didn't."
+          />
+          <Decision
+            title="Production-ize: model routing + cost guardrails"
+            body="Today the model is a constant (gpt-5.4-mini). In prod I'd route by signal — cheap+fast model for obvious newsletters, fall back to a stronger model on low-confidence batches — and put a per-user daily cost ceiling in front of it. The eval data already shows where the cost/accuracy knee is."
+          />
+          <Decision
+            title="Production-ize: observability + eval-driven prompt iteration"
+            body="Right now I read Convex logs and the in-app eval scatter. In prod I'd wire LangSmith-style traces on every classification + agent call, alert on accuracy drift against the locked dataset, and turn the eval harness into a pre-merge gate (no prompt change without a benchmark)."
+          />
+          <Decision
+            title="Production-ize: rate limits + Gmail backoff"
+            body="The Gmail sync action handles 429s with exponential backoff but doesn't checkpoint mid-sync — a 200-thread pull restarts from zero if it fails late. For larger inboxes, paginate sync into a workflow with resumable cursors."
+          />
+        </div>
       </Section>
 
       <Section
@@ -196,6 +323,48 @@ function VideoSection({
         </p>
       </div>
     </li>
+  );
+}
+
+function UsageRow({
+  surface,
+  lib,
+  body,
+}: {
+  surface: string;
+  lib: string;
+  body: string;
+}) {
+  return (
+    <div className="border border-[var(--rule)] bg-[var(--card-hi)] p-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <p className="text-[14px] font-medium">{surface}</p>
+        <p className="font-mono text-[11.5px] text-[var(--mute)]">{lib}</p>
+      </div>
+      <p className="mt-2 text-[12.5px] leading-snug text-[var(--ink)]">{body}</p>
+    </div>
+  );
+}
+
+function ToolRow({ name, body }: { name: string; body: string }) {
+  return (
+    <div className="grid grid-cols-[160px_1fr] gap-x-4 border border-[var(--rule)] bg-[var(--card-hi)] px-4 py-3">
+      <div className="font-mono text-[12.5px] text-[var(--ink)]">{name}</div>
+      <div className="text-[12.5px] leading-snug text-[var(--mute)]">
+        {body}
+      </div>
+    </div>
+  );
+}
+
+function Decision({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <p className="text-[14px] font-medium">{title}</p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--mute)]">
+        {body}
+      </p>
+    </div>
   );
 }
 
