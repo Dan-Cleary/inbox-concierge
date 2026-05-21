@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import DatasetTable from "./DatasetTable";
 import RunsPanel from "./RunsPanel";
+import { useConfirm } from "../components/ConfirmDialog";
 
 type Tab = "dataset" | "bench";
 
@@ -15,6 +16,7 @@ export default function EvalsPage() {
     null,
   );
   const [tab, setTab] = useState<Tab>("bench");
+  const { confirm, dialog } = useConfirm();
 
   if (datasets === undefined) {
     return <p className="text-sm text-neutral-500">Loading…</p>;
@@ -64,11 +66,13 @@ export default function EvalsPage() {
             <button
               type="button"
               onClick={async () => {
-                if (
-                  confirm(
-                    "Delete this dataset and all its runs/results?",
-                  )
-                ) {
+                const ok = await confirm({
+                  title: "Delete this dataset?",
+                  message: "All runs and results tied to it will be deleted too.",
+                  confirmLabel: "Delete",
+                  variant: "danger",
+                });
+                if (ok) {
                   await deleteDataset({ datasetId: currentDataset._id });
                   setSelected(null);
                 }
@@ -92,6 +96,7 @@ export default function EvalsPage() {
 
       {tab === "dataset" && <DatasetTable datasetId={currentDataset._id} />}
       {tab === "bench" && <RunsPanel datasetId={currentDataset._id} />}
+      {dialog}
     </div>
   );
 }

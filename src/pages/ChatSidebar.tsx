@@ -2,6 +2,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { useConfirm } from "../components/ConfirmDialog";
 
 export default function ChatSidebar({
   open,
@@ -21,6 +22,7 @@ export default function ChatSidebar({
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     if (!open || !scrollRef.current) return;
@@ -66,8 +68,13 @@ export default function ChatSidebar({
           {!empty && (
             <button
               type="button"
-              onClick={() => {
-                if (confirm("Clear chat history?")) clearChat();
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Clear chat history?",
+                  confirmLabel: "Clear",
+                  variant: "danger",
+                });
+                if (ok) clearChat();
               }}
               className="rounded px-2 py-1 text-xs font-medium hover:bg-neutral-100 hover:text-neutral-700"
               aria-label="Clear chat"
@@ -142,6 +149,7 @@ export default function ChatSidebar({
           </div>
         </div>
       </aside>
+      {dialog}
     </>
   );
 }

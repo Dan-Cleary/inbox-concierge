@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { CreateLabelButton } from "./BucketCreator";
+import { useConfirm } from "../components/ConfirmDialog";
 import BucketSuggestions from "./BucketSuggestions";
 import ChatSidebar from "./ChatSidebar";
 
@@ -54,6 +55,7 @@ export default function InboxView() {
   const startClassification = useMutation(api.workflows.startClassification);
   const deleteBucket = useMutation(api.inbox.deleteBucket);
   const { signOut } = useAuthActions();
+  const { confirm, dialog } = useConfirm();
 
   const [selected, setSelected] = useState<Selection>("all");
   const [syncing, setSyncing] = useState(false);
@@ -133,9 +135,15 @@ export default function InboxView() {
         setSelected(s);
         setMobileSidebarOpen(false);
       }}
-      onDeleteBucket={(b) => {
-        if (confirm(`Delete label "${b.name}"?`))
-          deleteBucket({ bucketId: b._id });
+      onDeleteBucket={async (b) => {
+        const ok = await confirm({
+          title: `Delete label "${b.name}"?`,
+          message:
+            "Emails in this label will be re-sorted into your remaining labels.",
+          confirmLabel: "Delete",
+          variant: "danger",
+        });
+        if (ok) deleteBucket({ bucketId: b._id });
       }}
       onSignOut={() => void signOut()}
       error={error}
@@ -206,6 +214,7 @@ export default function InboxView() {
         onClose={() => setChatOpen(false)}
         onCitationClick={handleCitationClick}
       />
+      {dialog}
     </div>
   );
 }
