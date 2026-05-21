@@ -5,6 +5,7 @@ import { ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import App from "./App";
 import EvalsPage from "./pages/EvalsPage";
+import AboutPage from "./pages/AboutPage";
 import Layout from "./Layout";
 import "./index.css";
 
@@ -25,6 +26,7 @@ createRoot(document.getElementById("root")!).render(
           <Route element={<Layout />}>
             <Route path="/" element={<App />} />
             <Route path="/evals" element={<EvalsPage />} />
+            <Route path="/about" element={<AboutPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

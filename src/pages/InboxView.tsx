@@ -48,15 +48,6 @@ export default function InboxView() {
     return () => clearTimeout(t);
   }, [highlightedEmailId]);
 
-  if (
-    buckets === undefined ||
-    emails === undefined ||
-    stats === undefined ||
-    stats === null
-  ) {
-    return <LoadingSkeleton />;
-  }
-
   const handleSync = useCallback(async () => {
     setSyncing(true);
     setError(null);
@@ -74,15 +65,25 @@ export default function InboxView() {
 
   // Assignment spec: "On load, group the user's last 200 threads." First
   // time a user lands with an empty inbox and no error, kick off sync
-  // automatically. The manual Sync button stays as the recovery path
-  // if sync errored out.
+  // automatically. Manual button only shows after an error.
   const shouldAutoSync =
-    emails.length === 0 && !syncing && !error;
+    emails !== undefined && emails.length === 0 && !syncing && !error;
   useEffect(() => {
     if (!shouldAutoSync) return;
+    // handleSync's first action is setSyncing(true), which flips
+    // shouldAutoSync false on the next render. Intentional.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void handleSync();
   }, [shouldAutoSync, handleSync]);
+
+  if (
+    buckets === undefined ||
+    emails === undefined ||
+    stats === undefined ||
+    stats === null
+  ) {
+    return <LoadingSkeleton />;
+  }
 
   if (emails.length === 0) {
     return (

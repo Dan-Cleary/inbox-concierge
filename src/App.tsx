@@ -24,7 +24,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setReviewerSigningIn(true);
     void signIn("reviewer", { secret }).catch(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReviewerSigningIn(false);
     });
   }, [isLoading, isAuthenticated, reviewerSigningIn, signIn]);

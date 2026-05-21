@@ -23,6 +23,7 @@ export default function Layout() {
             <nav className="flex items-center gap-6">
               <TabLink to="/">Inbox</TabLink>
               <TabLink to="/evals">Evals</TabLink>
+              <TabLink to="/about">About</TabLink>
             </nav>
           )}
         </div>
