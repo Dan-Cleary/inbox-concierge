@@ -4,6 +4,9 @@ An AI-native Gmail triage app: sign in with Google, we auto-label your last 200 
 
 Take-home build for Tenex. Stack picks are calibrated to the brief: "we ship systems, not demos."
 
+**Live app:** https://inbox-concierge-dan.vercel.app
+**Walkthrough page:** https://inbox-concierge-dan.vercel.app/about
+
 ---
 
 ## What it does
