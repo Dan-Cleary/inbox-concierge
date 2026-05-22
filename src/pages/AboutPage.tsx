@@ -10,6 +10,16 @@ export default function AboutPage() {
         <h1 className="mt-2 text-[28px] font-medium leading-tight tracking-tight">
           Inbox Concierge — for Tenex.
         </h1>
+        <div className="mt-5 border-l-2 border-[var(--moss)] bg-[var(--card-hi)] px-4 py-3">
+          <p className="kicker text-[var(--moss)]">Reviewers</p>
+          <p className="mt-1 text-[12.5px] leading-snug text-[var(--ink)]">
+            Google sign-in is gated to OAuth test users, so a cold Google
+            login won't get you in. Use the <strong>reviewer link in my
+            Ashby submission</strong> — it signs you straight into a
+            populated demo inbox. The link is kept out of the public repo
+            because it embeds a shared secret.
+          </p>
+        </div>
       </header>
 
       <Section

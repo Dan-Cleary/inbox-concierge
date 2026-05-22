@@ -7,6 +7,8 @@ Take-home build for Tenex. Stack picks are calibrated to the brief: "we ship sys
 **Live app:** https://inbox-concierge-dan.vercel.app
 **Walkthrough page:** https://inbox-concierge-dan.vercel.app/about
 
+> **Tenex reviewers:** the live app is gated behind Google OAuth in Testing mode, so a fresh Google sign-in won't work unless you're on the test-user list. To skip that, use the **reviewer link** in my Ashby submission — it signs you in directly to a populated demo inbox. The link is intentionally kept out of this repo because it embeds a shared secret.
+
 ---
 
 ## What it does
